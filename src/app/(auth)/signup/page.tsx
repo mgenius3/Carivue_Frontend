@@ -1,17 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CarivueLogo } from '@/components/ui/CarivueLogo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { RadioGroup } from '@/components/ui/RadioGroup';
 import { apiFetch } from '@/lib/api';
 import { Eye, EyeOff, Info } from 'lucide-react';
 
-export default function SignUpPage() {
+function SignUpContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token');
+
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -26,6 +28,12 @@ export default function SignUpPage() {
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (token) {
+      router.push(`/join-organisation?token=${token}`);
+    }
+  }, [token, router]);
 
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -68,6 +76,8 @@ export default function SignUpPage() {
       setLoading(false);
     }
   };
+
+  if (token) return null; // Prevent flash of signup form while redirecting
 
   return (
     <div>
@@ -169,5 +179,13 @@ export default function SignUpPage() {
         <Link href="/signin" className="text-secondary font-semibold hover:underline">Sign In</Link>
       </p>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpContent />
+    </Suspense>
   );
 }

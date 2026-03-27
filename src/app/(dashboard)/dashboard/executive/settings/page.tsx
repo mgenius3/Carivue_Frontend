@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Camera, Copy, Check, ChevronDown, Mail, Lock, Globe, Users, Trash2, Edit2, Plus } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
@@ -11,6 +11,7 @@ import {
   EditMemberRoleModal, 
   RemoveMemberModal 
 } from "@/components/dashboard/TeamModals";
+import { apiFetch } from "@/lib/api";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -19,6 +20,11 @@ function cn(...inputs: ClassValue[]) {
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile");
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [modalActionLoading, setModalActionLoading] = useState<null | "invite" | "remove">(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [teamRefreshKey, setTeamRefreshKey] = useState(0);
+  const [inviteOptions, setInviteOptions] = useState<any>({ roleOptions: ["manager", "coordinator"], sites: [] });
   
   // Modal States
   const [modalState, setModalState] = useState<{
@@ -31,8 +37,33 @@ export default function SettingsPage() {
     isOpen: false
   });
 
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const [profileData, teamOptions] = await Promise.all([
+        apiFetch<any>('/settings/profile', { token }),
+        apiFetch<any>('/settings/team/options', { token }),
+      ]);
+      setProfile(profileData);
+      setInviteOptions(teamOptions);
+    } catch (err) {
+      console.error("Settings fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   const handleCopy = () => {
-    navigator.clipboard.writeText("https://carivue.com/signal-input/meridian");
+    if (!profile?.organisation_name) return;
+    const slug = profile.organisation_name.toLowerCase().replace(/\s+/g, '-');
+    navigator.clipboard.writeText(`${window.location.origin}/signal-input/${slug}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -45,6 +76,10 @@ export default function SettingsPage() {
     setModalState(prev => ({ ...prev, isOpen: false }));
   };
 
+  const refreshTeamMembers = () => {
+    setTeamRefreshKey((prev) => prev + 1);
+  };
+
   const tabs = [
     { id: "profile", name: "Profile" },
     { id: "team", name: "Team Members" },
@@ -52,6 +87,16 @@ export default function SettingsPage() {
     { id: "general", name: "General" },
     { id: "preferences", name: "Preferences" },
   ];
+
+  if (loading || !profile) {
+    return (
+      <DashboardLayout title="Executive Dashboard">
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Executive Dashboard">
@@ -80,10 +125,10 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm min-h-[600px]">
-          {activeTab === "profile" && <ProfileTab handleCopy={handleCopy} copied={copied} />}
+          {activeTab === "profile" && <ProfileTab profile={profile} onUpdate={fetchData} handleCopy={handleCopy} copied={copied} />}
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "general" && <GeneralTab />}
-          {activeTab === "team" && <TeamMembersTab openModal={openModal} />}
+          {activeTab === "team" && <TeamMembersTab openModal={openModal} refreshKey={teamRefreshKey} />}
           {activeTab === "preferences" && <PreferencesTab />}
         </div>
       </div>
@@ -92,12 +137,39 @@ export default function SettingsPage() {
       <InviteMemberModal 
         isOpen={modalState.type === "invite" && modalState.isOpen} 
         onClose={closeModal}
-        onInvite={() => openModal("status", null, {
-            type: "success",
-            title: "Invitation Sent!",
-            message: "An email invite has been sent to <br/><b>loremipsum@gmail.com</b> to join your team.",
-            buttonText: "Awesome"
-        })}
+        onInvite={async (data: any) => {
+          setModalActionLoading("invite");
+          try {
+            const token = localStorage.getItem('token');
+            const result = await apiFetch<{ action?: string; emailStatus?: string; warning?: string }>('/settings/team/invite', {
+              method: 'POST',
+              body: JSON.stringify(data),
+              token: token || undefined
+            });
+            refreshTeamMembers();
+            fetchData();
+            openModal("status", null, {
+                type: "success",
+                title: result.action === "assigned" ? "Assignment Added!" : "Invitation Saved!",
+                message: result.action === "assigned"
+                  ? `<b>${data.email}</b> already exists in this organisation and has been assigned to the selected access scope.`
+                  : result.action === "updated_invite"
+                    ? result.emailStatus === "failed"
+                      ? `The pending invitation for <b>${data.email}</b> has been updated with the new assignment scope, but the email could not be sent.`
+                      : `The pending invitation for <b>${data.email}</b> has been updated with the new assignment scope.`
+                    : result.emailStatus === "failed"
+                      ? `The invitation for <b>${data.email}</b> has been saved, but the email could not be sent.`
+                      : `An email invite has been sent to <b>${data.email}</b> to join your team.`,
+                buttonText: "Awesome"
+            });
+          } catch (err: any) {
+            alert(err.message);
+          } finally {
+            setModalActionLoading(null);
+          }
+        }}
+        roleOptions={inviteOptions}
+        loading={modalActionLoading === "invite"}
       />
 
       <EditMemberRoleModal 
@@ -115,12 +187,31 @@ export default function SettingsPage() {
         isOpen={modalState.type === "remove" && modalState.isOpen} 
         onClose={closeModal}
         name={modalState.data?.name}
-        onConfirm={() => openModal("status", null, {
-            type: "success",
-            title: "Member Removed!",
-            message: `<b>${modalState.data?.name || 'Member'}</b> has been removed from your team.<br/> They no longer have access to the dashboard.`,
-            buttonText: "Done"
-        })}
+        onConfirm={async () => {
+          setModalActionLoading("remove");
+          try {
+            const token = localStorage.getItem('token');
+            const result = await apiFetch<{ type?: string }>(`/settings/team/${modalState.data.id}`, {
+              method: 'DELETE',
+              token: token || undefined
+            });
+            refreshTeamMembers();
+            fetchData();
+            openModal("status", null, {
+                type: "success",
+                title: result.type === "invite" ? "Invitation Removed!" : "Member Removed!",
+                message: result.type === "invite"
+                  ? `<b>${modalState.data?.email || 'Invitation'}</b> has been removed from your pending invites.`
+                  : `<b>${modalState.data?.name || 'Member'}</b> has been removed from your team.`,
+                buttonText: "Done"
+            });
+          } catch (err: any) {
+            alert(err.message);
+          } finally {
+            setModalActionLoading(null);
+          }
+        }}
+        loading={modalActionLoading === "remove"}
       />
 
       <StatusModal 
@@ -133,8 +224,48 @@ export default function SettingsPage() {
 }
 
 function PreferencesTab() {
-  const [emailEnabled, setEmailEnabled] = useState(true);
-  const [inAppEnabled, setInAppEnabled] = useState(true);
+  const [preferences, setPreferences] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const fetchPrefs = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const data = await apiFetch<any>('/settings/preferences', { token: token || undefined });
+      setPreferences(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPrefs();
+  }, []);
+
+  const handleToggle = (key: string) => {
+    setPreferences((prev: any) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      await apiFetch('/settings/preferences', {
+        method: 'PUT',
+        body: JSON.stringify(preferences),
+        token: token || undefined
+      });
+      alert('Preferences saved');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading || !preferences) return null;
 
   return (
     <div className="space-y-10 animate-fade-in max-w-4xl">
@@ -153,7 +284,7 @@ function PreferencesTab() {
                 <p className="text-sm font-bold text-[#1F3A4A] mb-1">Email Notifications</p>
                 <p className="text-[12px] text-gray-400 font-medium">Receive email updates for important events</p>
               </div>
-              <Toggle enabled={emailEnabled} onChange={setEmailEnabled} />
+              <Toggle enabled={!!preferences.email_notifications} onChange={() => handleToggle('email_notifications')} />
             </div>
 
             <div className="flex items-center justify-between group">
@@ -161,7 +292,7 @@ function PreferencesTab() {
                 <p className="text-sm font-bold text-[#1F3A4A] mb-1">In-App Notifications</p>
                 <p className="text-[12px] text-gray-400 font-medium">Show notifications within the application</p>
               </div>
-              <Toggle enabled={inAppEnabled} onChange={setInAppEnabled} />
+              <Toggle enabled={!!preferences.in_app_notifications} onChange={() => handleToggle('in_app_notifications')} />
             </div>
           </div>
         </section>
@@ -170,8 +301,12 @@ function PreferencesTab() {
           <button className="px-8 py-3 rounded-xl text-sm font-bold text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100">
             Reset to Defaults
           </button>
-          <button className="bg-[#1F3A4A] text-white px-10 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-all">
-            Save Changes
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-[#1F3A4A] text-white px-10 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>
@@ -198,7 +333,32 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
     );
 }
 
-function ProfileTab({ handleCopy, copied }: { handleCopy: () => void; copied: boolean }) {
+function ProfileTab({ profile, onUpdate, handleCopy, copied }: { profile: any, onUpdate: () => void, handleCopy: () => void; copied: boolean }) {
+  const [formData, setFormData] = useState({
+    firstName: profile.first_name,
+    lastName: profile.last_name,
+    organisationName: profile.organisation_name || ""
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      await apiFetch('/settings/profile', {
+        method: 'PUT',
+        body: JSON.stringify(formData),
+        token: token || undefined
+      });
+      onUpdate();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-10 animate-fade-in">
       <div>
@@ -210,17 +370,14 @@ function ProfileTab({ handleCopy, copied }: { handleCopy: () => void; copied: bo
         <div className="flex items-center gap-6">
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-[#FFF8F1] flex items-center justify-center border-4 border-white shadow-md">
-                   <img src="/avatar-placeholder.png" alt="Profile" className="w-full h-full rounded-full object-cover hidden" />
-                   <div className="w-full h-full rounded-full bg-secondary/10 flex items-center justify-center text-secondary text-2xl font-bold">HA</div>
+                   <div className="w-full h-full rounded-full bg-secondary/10 flex items-center justify-center text-secondary text-2xl font-bold">
+                     {profile.first_name[0]}{profile.last_name[0]}
+                   </div>
             </div>
-            <button className="absolute bottom-0 right-0 p-1.5 bg-white rounded-full shadow-lg border border-gray-100 text-gray-400 hover:text-primary transition-colors">
-              <Camera size={14} />
-            </button>
           </div>
           <div>
-            <h3 className="text-lg font-bold text-[#1F3A4A]">Helen Anthony</h3>
-            <p className="text-sm text-gray-400 font-bold">Executive</p>
-            <p className="text-[10px] text-gray-400 font-medium mt-1">Joined July 2025</p>
+            <h3 className="text-lg font-bold text-[#1F3A4A]">{profile.first_name} {profile.last_name}</h3>
+            <p className="text-sm text-gray-400 font-bold uppercase">{profile.role}</p>
           </div>
         </div>
 
@@ -233,22 +390,33 @@ function ProfileTab({ handleCopy, copied }: { handleCopy: () => void; copied: bo
         </button>
       </div>
 
-      <form className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
-        <Input label="First Name" placeholder="Helen" />
-        <Input label="Last Name" placeholder="Anthony" />
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
+        <Input 
+          label="First Name" 
+          value={formData.firstName} 
+          onChange={(e: any) => setFormData({...formData, firstName: e.target.value})}
+        />
+        <Input 
+          label="Last Name" 
+          value={formData.lastName} 
+          onChange={(e: any) => setFormData({...formData, lastName: e.target.value})}
+        />
         <div className="md:col-span-2">
-            <Input label="Organisation Name" placeholder="Meridian Care Group" icon={Users} />
+            <Input 
+              label="Organisation Name" 
+              icon={Users} 
+              value={formData.organisationName} 
+              onChange={(e: any) => setFormData({...formData, organisationName: e.target.value})}
+            />
         </div>
-        <Select label="Sector Type" value="Residential Care" options={["Residential Care", "Domiciliary", "Supported Living"]} />
-        <Input label="Email Address" placeholder="info@marigoldhospital.ng" icon={Mail} />
-        <Input label="Total Staffing Size" placeholder="12" />
-        <Input label="Size of Residence" placeholder="00" />
-        <Input label="Average care hours per week**" placeholder="00" />
-        <Select label="Country*" value="Nigeria" options={["Nigeria", "United Kingdom", "United States"]} />
         
         <div className="md:col-span-2 pt-6">
-          <button type="submit" className="bg-[#1F3A4A] text-white px-10 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-all">
-            Save Changes
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-[#1F3A4A] text-white px-10 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </form>
@@ -257,6 +425,35 @@ function ProfileTab({ handleCopy, copied }: { handleCopy: () => void; copied: bo
 }
 
 function SecurityTab() {
+  const [passwords, setPasswords] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token') || "";
+      await apiFetch('/settings/security', {
+        method: 'PUT',
+        body: JSON.stringify(passwords),
+        token
+      });
+      alert("Password updated");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-10 animate-fade-in max-w-2xl">
       <div>
@@ -264,14 +461,39 @@ function SecurityTab() {
         <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">Manage your password and security preferences</p>
       </div>
 
-      <form className="space-y-8">
-        <Input label="Current Password" type="password" placeholder="••••••••" icon={Lock} />
-        <Input label="New Password" type="password" placeholder="••••••••" icon={Lock} />
-        <Input label="Confirm New Password" type="password" placeholder="••••••••" icon={Lock} />
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <Input 
+          label="Current Password" 
+          type="password" 
+          placeholder="••••••••" 
+          icon={Lock} 
+          value={passwords.currentPassword}
+          onChange={(e: any) => setPasswords({...passwords, currentPassword: e.target.value})}
+        />
+        <Input 
+          label="New Password" 
+          type="password" 
+          placeholder="••••••••" 
+          icon={Lock} 
+          value={passwords.newPassword}
+          onChange={(e: any) => setPasswords({...passwords, newPassword: e.target.value})}
+        />
+        <Input 
+          label="Confirm New Password" 
+          type="password" 
+          placeholder="••••••••" 
+          icon={Lock} 
+          value={passwords.confirmPassword}
+          onChange={(e: any) => setPasswords({...passwords, confirmPassword: e.target.value})}
+        />
         
         <div className="pt-6">
-          <button type="submit" className="bg-[#1F3A4A] text-white px-10 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-all">
-            Save Changes
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-[#1F3A4A] text-white px-10 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </form>
@@ -335,13 +557,28 @@ function GeneralTab() {
   );
 }
 
-function TeamMembersTab({ openModal }: { openModal: any }) {
-  const members = [
-    { name: "Marvin McKinney", email: "Lorem@ipsum.com", role: "Executive", status: "Accepted", date: "10/04/2025" },
-    { name: "Savannah Nguyen", email: "Lorem@ipsum.com", role: "Manager", status: "Accepted", date: "10/04/2025" },
-    { name: "Annette Black", email: "Lorem@ipsum.com", role: "Manager", status: "Pending", date: "10/04/2025" },
-    { name: "Cody Fisher", email: "Lorem@ipsum.com", role: "Manager", status: "Accepted", date: "10/04/2025" },
-  ];
+function TeamMembersTab({ openModal, refreshKey }: { openModal: any; refreshKey: number }) {
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMembers = async () => {
+    try {
+      const token = localStorage.getItem('token') || "";
+      const data = await apiFetch<any[]>('/settings/team', { token });
+      setMembers(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    fetchMembers();
+  }, [refreshKey]);
+
+  if (loading) return null;
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -373,10 +610,10 @@ function TeamMembersTab({ openModal }: { openModal: any }) {
           <tbody className="divide-y divide-gray-50">
             {members.map((member, i) => (
               <tr key={i} className="hover:bg-gray-50/30 transition-colors">
-                <td className="py-5 text-sm font-medium text-gray-400">{member.date}</td>
-                <td className="py-5 text-sm font-bold text-[#1F3A4A]">{member.name}</td>
+                <td className="py-5 text-sm font-medium text-gray-400">{new Date(member.date_invited).toLocaleDateString()}</td>
+                <td className="py-5 text-sm font-bold text-[#1F3A4A]">{member.name || (member.first_name ? `${member.first_name} ${member.last_name}` : "Pending Invite")}</td>
                 <td className="py-5 text-sm font-medium text-gray-400">{member.email}</td>
-                <td className="py-5 text-sm font-medium text-gray-500">{member.role}</td>
+                <td className="py-5 text-sm font-medium text-gray-500 uppercase">{member.role}</td>
                 <td className="py-5">
                    <span className={cn(
                      "text-[10px] font-bold px-3 py-1 rounded-md uppercase tracking-wide",

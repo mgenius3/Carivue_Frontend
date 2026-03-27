@@ -26,10 +26,10 @@ interface ScoreData {
 interface ScoreExplanationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  type: "CSI" | "OAI" | "MOD";
+  type: "CSI" | "OAI" | "MOD" | "CSD";
 }
 
-const content: Record<"CSI" | "OAI" | "MOD", ScoreData> = {
+const content: Record<"CSI" | "OAI" | "MOD" | "CSD", ScoreData> = {
   CSI: {
     title: "Carivue Stability Index (CSI)",
     description: "Represents the overall level of operational strain within a service by measuring deviations in stabilisation effort from the service's normal operating baseline.",
@@ -82,6 +82,27 @@ const content: Record<"CSI" | "OAI" | "MOD", ScoreData> = {
     sectionTitle: "Interpretation",
     sectionIcon: HelpCircle,
     sectionText: "Managerial effort is increasing gradually but remains within the target range."
+  },
+  CSD: {
+    title: "Clinical Stabilisation Density (CSD)",
+    description: "CSD reflects the level of active clinical oversight and resident stabilisation effort needed to maintain safe delivery.",
+    value: "18 Clinical Events",
+    status: "Monitor",
+    statusVariant: "warning",
+    trend: "8%",
+    baselineData: [
+      { label: "Baseline (6-Weeks Equilibrium)", value: "14" },
+      { label: "Baseline Tolerance Range", value: "10 - 17" },
+      { label: "Current Position", value: "+4 above Baseline", highlight: "warning" },
+    ],
+    sectionTitle: "Clinical Drivers (This Period)",
+    secondaryData: [
+      { label: "Clinical monitoring cases", value: "7" },
+      { label: "Health deterioration events", value: "4" },
+      { label: "Hospital admissions", value: "2" },
+      { label: "Increased observations", value: "5" },
+    ],
+    sectionIcon: Layers,
   }
 };
 

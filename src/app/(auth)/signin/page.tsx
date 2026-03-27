@@ -24,7 +24,7 @@ export default function SignInPage() {
     setLoading(true);
 
     try {
-      const result = await apiFetch<{ token: string; user: { proceedIntent: string; organisationId: number | null; emailVerified: boolean } }>(
+      const result = await apiFetch<{ token: string; user: { role: string; proceedIntent: string; organisationId: number | null; emailVerified: boolean } }>(
         '/auth/signin',
         {
           method: 'POST',
@@ -40,7 +40,17 @@ export default function SignInPage() {
       } else if (!result.user.organisationId) {
         router.push('/create-organisation');
       } else {
-        router.push('/dashboard/executive');
+        // Role-based redirection
+        const role = (result.user.role || 'executive').toLowerCase();
+        if (role === 'executive') {
+          router.push('/dashboard/executive');
+        } else if (role === 'manager') {
+          router.push('/dashboard/manager');
+        } else if (role === 'coordinator' || role === 'care coordinator') {
+          router.push('/signal-input');
+        } else {
+          router.push('/dashboard/executive');
+        }
       }
     } catch (err: any) {
       setError(err.message);

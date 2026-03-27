@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutGrid, 
   MapPin, 
   FileText, 
   Settings, 
   LifeBuoy, 
-  LogOut 
+  LogOut,
+  Building2 
 } from "lucide-react";
 import { CarivueLogo } from "@/components/ui/CarivueLogo";
+import { logoutUser } from "@/lib/auth";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -24,14 +26,16 @@ interface SidebarProps {
 
 export function Sidebar({ role = "executive" }: SidebarProps) {
   const pathname = usePathname();
-  const dashboardHref = role === "executive" ? "/dashboard/executive" : "/dashboard/manager";
+  const router = useRouter();
+  const isManager = role === "manager";
+  const prefix = isManager ? "/dashboard/manager" : "/dashboard/executive";
   
   const navItems = [
-    { name: "Dashboard", href: dashboardHref, icon: LayoutGrid },
-    { name: "Sites", href: "/dashboard/sites", icon: MapPin },
-    { name: "Reports", href: "/dashboard/reports", icon: FileText },
-    { name: "Settings", href: "/dashboard/settings", icon: Settings },
-    { name: "Help & Support", href: "/dashboard/help", icon: LifeBuoy },
+    { name: "Dashboard", href: prefix, icon: LayoutGrid },
+    { name: isManager ? "Unit" : "Sites", href: isManager ? `${prefix}/unit` : `${prefix}/sites`, icon: isManager ? Building2 : MapPin },
+    { name: "Reports", href: `${prefix}/reports`, icon: FileText },
+    { name: "Settings", href: `${prefix}/settings`, icon: Settings },
+    { name: "Help & Support", href: `${prefix}/help`, icon: LifeBuoy },
   ];
 
   return (
@@ -44,7 +48,7 @@ export function Sidebar({ role = "executive" }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href !== prefix && pathname.startsWith(item.href));
           const Icon = item.icon;
 
           return (
@@ -69,7 +73,7 @@ export function Sidebar({ role = "executive" }: SidebarProps) {
       <div className="p-4 border-t border-gray-100 mb-8">
         <button 
           className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-[#E05B5B] hover:bg-red-50 rounded-lg transition-colors"
-          onClick={() => console.log("Logout")}
+          onClick={() => logoutUser(router)}
         >
           <LogOut size={20} />
           Logout

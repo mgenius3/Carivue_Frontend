@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { GaugeChart } from "@/components/dashboard/GaugeChart";
@@ -12,64 +13,116 @@ import { Calendar, Download, RefreshCw } from "lucide-react";
 import { AddSiteModal } from "@/components/dashboard/modals/AddSiteModal";
 import { AddOrgModal } from "@/components/dashboard/modals/AddOrgModal";
 import { ScoreExplanationModal } from "@/components/dashboard/modals/ScoreExplanationModal";
-
-// Mock data for charts
-const trendData = [
-  { name: "Week 1", csi: 75, mod: 55, csd: 40 },
-  { name: "Week 2", csi: 74, mod: 10, csd: 30 },
-  { name: "Week 3", csi: 5, mod: 15, csd: 10 },
-  { name: "Week 4", csi: 92, mod: 85, csd: 8 },
-  { name: "Week 5", csi: 55, mod: 58, csd: 35 },
-  { name: "Week 6", csi: 5, mod: 8, csd: 10 },
-];
-
-const sparklineData = [
-  { value: 10 }, { value: 15 }, { value: 8 }, { value: 12 }, { value: 20 }, { value: 18 }, { value: 25 }
-];
-
-const sparklineDataYellow = [
-    { value: 5 }, { value: 8 }, { value: 12 }, { value: 10 }, { value: 15 }, { value: 22 }, { value: 28 }
-];
-
-const sparklineDataGreen = [
-    { value: 20 }, { value: 18 }, { value: 22 }, { value: 25 }, { value: 20 }, { value: 15 }, { value: 10 }
-];
-
-const sitesData = [
-  { 
-    id: "1", 
-    name: "Willowbrooks Care Home", 
-    csi: 74, 
-    status: "Escalating Strain", 
-    layer: "OAI" 
-  },
-  { 
-    id: "2", 
-    name: "Riversides Residential Care", 
-    csi: 66, 
-    status: "Emerging Strain", 
-    layer: "MOD" 
-  },
-  { 
-    id: "3", 
-    name: "Oakwoods Supported Living", 
-    csi: 52, 
-    status: "Stable", 
-    layer: "Balanced" 
-  },
-];
+import { apiFetch } from "@/lib/api";
 
 export default function ExecutiveDashboard() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [overview, setOverview] = useState<any>(null);
+  const [sites, setSites] = useState<any[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
   const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
   const [isAddOrgModalOpen, setIsAddOrgModalOpen] = useState(false);
-  const [explanationModal, setExplanationModal] = useState<{ isOpen: boolean; type: "CSI" | "OAI" | "MOD" }>({
+  const [explanationModal, setExplanationModal] = useState<{ isOpen: boolean; type: "CSI" | "OAI" | "MOD" | "CSD" }>({
     isOpen: false,
     type: "CSI"
   });
 
-  const openExplanation = (type: "CSI" | "OAI" | "MOD") => {
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/signin');
+        return;
+      }
+
+      const [overviewData, sitesData, historyData] = await Promise.all([
+        apiFetch<any>(`/dashboard/overview?t=${Date.now()}`, { 
+          token,
+          cache: 'no-store' as RequestCache 
+        }),
+        apiFetch<any>(`/dashboard/sites?t=${Date.now()}`, { 
+          token,
+          cache: 'no-store' as RequestCache 
+        }),
+        apiFetch<any>(`/signals/history?t=${Date.now()}`, {
+          token,
+          cache: 'no-store' as RequestCache
+        })
+      ]);
+
+      setOverview(overviewData);
+      setSites(sitesData.sites);
+      setHistory(historyData.submissions || []);
+    } catch (err: any) {
+      console.error("Dashboard fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [router]);
+
+  const openExplanation = (type: "CSI" | "OAI" | "MOD" | "CSD") => {
     setExplanationModal({ isOpen: true, type });
   };
+
+  if (loading || !overview) {
+    return (
+      <DashboardLayout title="Executive Dashboard">
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const { current, trend } = overview;
+
+  // Format trend data for TrendChart
+  const formattedTrend = trend.map((t: any) => ({
+    name: new Date(t.week_ending).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    csi: parseFloat(t.csi),
+    mod: parseFloat(t.mod_val),
+    csd: parseFloat(t.csd)
+  }));
+
+  // Sparkline placeholders for now (could be derived from trend)
+  const oaiTrend = trend.map((t: any) => ({ value: parseFloat(t.oai) }));
+  const modTrend = trend.map((t: any) => ({ value: parseFloat(t.mod_val) }));
+  const csdTrend = trend.map((t: any) => ({ value: parseFloat(t.csd) }));
+
+  const statusMap: Record<string, string> = {
+    stable: "Stable",
+    emerging_strain: "Emerging Strain",
+    escalating_strain: "Escalating Strain",
+    critical: "Critical"
+  };
+
+  const statusVariantMap: Record<string, "success" | "warning" | "error" | "neutral"> = {
+    stable: "success",
+    emerging_strain: "warning",
+    escalating_strain: "error",
+    critical: "error"
+  };
+
+  const reviewItems = sites
+    .filter((site) => site.status !== "stable")
+    .sort((a, b) => Number(b.csi) - Number(a.csi))
+    .slice(0, 3)
+    .map((site) => ({
+      text: `${site.name} is showing ${statusMap[site.status]?.toLowerCase() || "heightened"} strain. Dominant pressure is ${site.dominant_layer || "mixed"}.`,
+    }));
+
+  const recentSubmissionItems = history.slice(0, 5).map((item: any) => ({
+    name: `${item.site_name} - ${item.unit_name}`,
+    status: "Submitted",
+    variant: "success" as const,
+    detail: `${new Date(item.week_ending).toLocaleDateString()} at ${item.time} by ${item.submitted_by}`,
+  }));
 
   return (
     <DashboardLayout 
@@ -80,17 +133,13 @@ export default function ExecutiveDashboard() {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#1F3A4A]">Meridian Care Group</h1>
-            <p className="text-sm text-gray-400 font-medium">Reporting Period: 18-24 March 2026</p>
+            <h1 className="text-2xl font-bold text-[#1F3A4A]">Executive Dashboard</h1>
+            <p className="text-sm text-gray-400 font-medium">
+              Reporting Period: {new Date(current.week_ending).toLocaleDateString()}
+            </p>
           </div>
           
           <div className="flex items-center gap-3">
-            <button 
-                onClick={() => setIsAddOrgModalOpen(true)}
-                className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-semibold text-secondary shadow-sm hover:bg-gray-50 transition-colors"
-            >
-              Add Organisation
-            </button>
             <button className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-semibold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors">
               <Calendar size={14} className="text-gray-400" />
               Current Week
@@ -99,7 +148,10 @@ export default function ExecutiveDashboard() {
               <Download size={14} className="text-gray-400" />
               Export
             </button>
-            <button className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-semibold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors">
+            <button 
+              onClick={fetchData}
+              className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-semibold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors"
+            >
               <RefreshCw size={14} className="text-gray-400" />
               Refresh
             </button>
@@ -110,18 +162,24 @@ export default function ExecutiveDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div onClick={() => openExplanation("CSI")} className="cursor-pointer">
             <KpiCard title="Carivue Stability Index">
-              <GaugeChart value={68} label="68%" status="Emerging Strain" size={140} strokeWidth={10} />
+              <GaugeChart 
+                value={parseFloat(current.csi)} 
+                label={`${current.csi}%`} 
+                status={statusMap[current.status] || "Stable"} 
+                size={140} 
+                strokeWidth={10} 
+              />
             </KpiCard>
           </div>
           
           <div onClick={() => openExplanation("OAI")} className="cursor-pointer">
             <KpiCard 
                 title="Overtime Amplification Index" 
-                status="Elevated" 
-                statusVariant="error" 
-                trend="12%" 
-                trendDirection="up"
-                data={sparklineData}
+                status={statusMap[current.status] || "Stable"} 
+                statusVariant={statusVariantMap[current.status]} 
+                trend={current.oai > 50 ? "high" : "low"} 
+                trendDirection={current.oai > 50 ? "up" : "down"}
+                data={oaiTrend}
                 color="#EF4444"
             />
           </div>
@@ -129,28 +187,28 @@ export default function ExecutiveDashboard() {
           <div onClick={() => openExplanation("MOD")} className="cursor-pointer">
             <KpiCard 
                 title="Manual Override Density" 
-                status="Stable but rising" 
-                statusVariant="warning" 
-                trend="6%" 
-                trendDirection="up"
-                data={sparklineDataYellow}
+                status={current.mod_val > 40 ? "Elevated" : "Normal"} 
+                statusVariant={current.mod_val > 40 ? "warning" : "success"} 
+                trend="" 
+                data={modTrend}
                 color="#EAB308"
             />
           </div>
           
-          <KpiCard 
-            title="Clinical Stabilisation Density" 
-            status="Normal" 
-            statusVariant="success" 
-            trend="2%" 
-            trendDirection="down"
-            data={sparklineDataGreen}
-            color="#22C55E"
-          />
+          <div onClick={() => openExplanation("CSD")} className="cursor-pointer">
+            <KpiCard 
+                title="Clinical Stabilisation Density" 
+                status={current.csd > 30 ? "Monitor" : "Stable"} 
+                statusVariant={current.csd > 30 ? "warning" : "success"} 
+                trend="" 
+                data={csdTrend}
+                color="#22C55E"
+            />
+          </div>
         </div>
 
         {/* trend Chart */}
-        <TrendChart data={trendData} />
+        <TrendChart data={formattedTrend} title="Organisation Strain Trend" />
 
         {/* Sites Overview */}
         <div onClick={(e) => {
@@ -159,16 +217,20 @@ export default function ExecutiveDashboard() {
                 setIsAddSiteModalOpen(true);
             }
         }}>
-            <SitesOverview sites={sitesData} />
+            <SitesOverview sites={sites.map(s => ({
+                ...s,
+                layer: s.dominant_layer || "Balanced",
+                status: statusMap[s.status] || "Stable"
+            }))} />
         </div>
 
         {/* Bottom Section: Review & Submission */}
         <div className="grid lg:grid-cols-5 gap-8 mb-10">
           <div className="lg:col-span-3">
-            <OperationalReview />
+            <OperationalReview items={reviewItems} />
           </div>
           <div className="lg:col-span-2">
-            <SignalSubmission />
+            <SignalSubmission items={recentSubmissionItems} />
           </div>
         </div>
       </div>

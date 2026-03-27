@@ -11,18 +11,27 @@ import {
   ResponsiveContainer,
   Legend
 } from "recharts";
+import { getPeriodLabel } from "@/lib/reporting";
 
 interface TrendChartProps {
   data: any[];
+  title?: string;
+  periodLabel?: string;
 }
 
-export function TrendChart({ data }: TrendChartProps) {
+export function TrendChart({
+  data,
+  title = "Strain Trend",
+  periodLabel,
+}: TrendChartProps) {
+  const resolvedPeriodLabel = periodLabel || getPeriodLabel(data.length);
+
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[400px]">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-base font-bold text-[#1F3A4A]">Organisation Strain Trend</h3>
+        <h3 className="text-base font-bold text-[#1F3A4A]">{title}</h3>
         <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">Last 6 Weeks</span>
+            <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">{resolvedPeriodLabel}</span>
         </div>
       </div>
 

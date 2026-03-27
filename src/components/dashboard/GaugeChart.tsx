@@ -17,9 +17,11 @@ export function GaugeChart({
   size = 180,
   strokeWidth = 14
 }: GaugeChartProps) {
+  // Ensure value is a valid number and clamped between 0 and 100
+  const safeValue = isNaN(value) ? 0 : Math.min(100, Math.max(0, value));
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * Math.PI; // Half circle
-  const offset = circumference - (value / 100) * circumference;
+  const offset = circumference - (safeValue / 100) * circumference;
 
   return (
     <div className="flex flex-col items-center">
@@ -62,8 +64,8 @@ export function GaugeChart({
           <line
             x1={size / 2}
             y1={size / 2}
-            x2={size / 2 + (radius - 5) * Math.cos(Math.PI + (value / 100) * Math.PI)}
-            y2={size / 2 + (radius - 5) * Math.sin(Math.PI + (value / 100) * Math.PI)}
+            x2={size / 2 + (radius - 5) * Math.cos(Math.PI + (safeValue / 100) * Math.PI)}
+            y2={size / 2 + (radius - 5) * Math.sin(Math.PI + (safeValue / 100) * Math.PI)}
             stroke="#1F2937"
             strokeWidth="3"
             strokeLinecap="round"

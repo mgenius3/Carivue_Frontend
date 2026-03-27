@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Navbar } from "./Navbar";
+import { apiFetch } from "@/lib/api";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -16,6 +18,31 @@ export function DashboardLayout({
   role = "executive",
   onAddOrg
 }: DashboardLayoutProps) {
+  const [profile, setProfile] = useState<{
+    first_name?: string;
+    last_name?: string;
+    organisation_name?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      return;
+    }
+
+    apiFetch<{
+      first_name?: string;
+      last_name?: string;
+      organisation_name?: string;
+    }>("/settings/profile", { token })
+      .then(setProfile)
+      .catch(() => setProfile(null));
+  }, []);
+
+  const userName = profile
+    ? [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim()
+    : undefined;
+
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex">
       {/* Sidebar */}
@@ -27,6 +54,8 @@ export function DashboardLayout({
         <Navbar 
           title={title} 
           role={role.charAt(0).toUpperCase() + role.slice(1)} 
+          userName={userName || undefined}
+          orgName={profile?.organisation_name || undefined}
           onAddOrg={onAddOrg}
         />
 

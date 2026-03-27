@@ -28,7 +28,62 @@ function ModalBase({ isOpen, onClose, children }: ModalProps) {
 }
 
 // 1. Invite Team Member
-export function InviteMemberModal({ isOpen, onClose, onInvite }: any) {
+export function InviteMemberModal({ isOpen, onClose, onInvite, roleOptions, loading = false }: any) {
+  const inviteConfig =
+    roleOptions && !Array.isArray(roleOptions)
+      ? roleOptions
+      : { roleOptions: roleOptions || ["manager", "coordinator"], sites: [] };
+  const roles = inviteConfig.roleOptions || ["manager", "coordinator"];
+  const [email, setEmail] = React.useState("");
+  const [role, setRole] = React.useState(roles[0]);
+  const [selectedSiteIds, setSelectedSiteIds] = React.useState<number[]>([]);
+  const [selectedUnitIds, setSelectedUnitIds] = React.useState<number[]>([]);
+
+  const sites = Array.isArray(inviteConfig.sites) ? inviteConfig.sites : [];
+
+  React.useEffect(() => {
+    setRole(roles[0]);
+  }, [isOpen]); // reset role when re-opened
+
+  React.useEffect(() => {
+    setSelectedSiteIds([]);
+    setSelectedUnitIds([]);
+  }, [role]);
+
+  const normalizedRole = String(role).toLowerCase();
+  const displayLabel = normalizedRole === "coordinator" ? "Care Coordinator" : "Manager";
+
+  const toggleSite = (siteId: number) => {
+    setSelectedSiteIds((prev) =>
+      prev.includes(siteId) ? prev.filter((id) => id !== siteId) : [...prev, siteId]
+    );
+  };
+
+  const toggleUnit = (unitId: number) => {
+    setSelectedUnitIds((prev) =>
+      prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId]
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!email.trim()) return;
+    if (normalizedRole === "manager" && selectedSiteIds.length === 0) return;
+    if (normalizedRole === "coordinator" && selectedUnitIds.length === 0) return;
+
+    await onInvite({
+      email: email.trim(),
+      role: normalizedRole,
+      siteIds: selectedSiteIds,
+      unitIds: selectedUnitIds,
+    });
+
+    // Reset
+    setEmail("");
+    setRole(roles[0]);
+    setSelectedSiteIds([]);
+    setSelectedUnitIds([]);
+  };
+
   return (
     <ModalBase isOpen={isOpen} onClose={onClose}>
       <div className="text-center space-y-6">
@@ -42,32 +97,108 @@ export function InviteMemberModal({ isOpen, onClose, onInvite }: any) {
         <div className="space-y-4 text-left">
             <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">E-Mail</label>
-                <input type="email" placeholder="ayo@gmail.com" className="w-full border border-gray-100 rounded-lg px-4 py-2.5 text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-primary/5" />
+                <input 
+                  type="email" 
+                  placeholder="ayo@gmail.com" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  className="w-full border border-gray-100 rounded-lg px-4 py-2.5 text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-primary/5" 
+                />
             </div>
             <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Assign role</label>
-                <select className="w-full border border-gray-100 rounded-lg px-4 py-2.5 text-sm bg-gray-50/50 focus:outline-none">
-                    <option>Manager</option>
-                    <option>Executive</option>
-                    <option>Care Coordinator</option>
+                <select 
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  disabled={loading}
+                  className="w-full border border-gray-100 rounded-lg px-4 py-2.5 text-sm bg-gray-50/50 focus:outline-none"
+                >
+                    {roles.map((r: string) => (
+                      <option key={r} value={r}>
+                        {String(r).toLowerCase() === "coordinator" ? "Care Coordinator" : "Manager"}
+                      </option>
+                    ))}
                 </select>
             </div>
-            <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Select Site</label>
-                <select className="w-full border border-gray-100 rounded-lg px-4 py-2.5 text-sm bg-gray-50/50 focus:outline-none">
-                    <option>Select Site</option>
-                    <option>Willowbrooks</option>
-                    <option>Riversides</option>
-                </select>
-            </div>
+
+            {normalizedRole === "manager" && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Assign Sites</label>
+                <div className="max-h-44 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 p-3 space-y-2">
+                  {sites.length === 0 && (
+                    <p className="text-xs text-gray-400">No sites available to assign.</p>
+                  )}
+                  {sites.map((site: any) => (
+                    <label key={site.id} className="flex items-center gap-2 text-sm text-[#1F3A4A]">
+                      <input
+                        type="checkbox"
+                        checked={selectedSiteIds.includes(site.id)}
+                        onChange={() => toggleSite(site.id)}
+                        disabled={loading}
+                        className="accent-primary"
+                      />
+                      <span>{site.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {normalizedRole === "coordinator" && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Assign Units</label>
+                <div className="max-h-56 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 p-3 space-y-3">
+                  {sites.length === 0 && (
+                    <p className="text-xs text-gray-400">No units available to assign.</p>
+                  )}
+                  {sites.map((site: any) => (
+                    <div key={site.id}>
+                      <p className="text-xs font-bold text-[#1F3A4A] uppercase tracking-wide mb-2">{site.name}</p>
+                      <div className="space-y-2">
+                        {(site.units || []).length === 0 && (
+                          <p className="text-xs text-gray-400">No units under this site.</p>
+                        )}
+                        {(site.units || []).map((unit: any) => (
+                          <label key={unit.id} className="flex items-center gap-2 text-sm text-[#1F3A4A]">
+                            <input
+                              type="checkbox"
+                              checked={selectedUnitIds.includes(unit.id)}
+                              onChange={() => toggleUnit(unit.id)}
+                              disabled={loading}
+                              className="accent-primary"
+                            />
+                            <span>{unit.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
         </div>
 
         <div className="flex gap-3 pt-4">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-bold border border-gray-100 text-[#1F3A4A] hover:bg-gray-50 transition-colors">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-lg text-sm font-bold border border-gray-100 text-[#1F3A4A] hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
             Cancel
           </button>
-          <button onClick={onInvite} className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-[#1F3A4A] text-white hover:bg-[#2c4e62] transition-colors">
-            Invite
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-[#1F3A4A] text-white hover:bg-[#2c4e62] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {loading
+              ? normalizedRole === "coordinator"
+                ? `Assigning ${displayLabel}...`
+                : `Inviting ${displayLabel}...`
+              : normalizedRole === "coordinator"
+                ? `Assign ${displayLabel}`
+                : `Invite ${displayLabel}`}
           </button>
         </div>
       </div>
@@ -154,7 +285,7 @@ export function EditMemberRoleModal({ isOpen, onClose, name, onSave }: any) {
 }
 
 // 4. Remove Team Member
-export function RemoveMemberModal({ isOpen, onClose, name, onConfirm }: any) {
+export function RemoveMemberModal({ isOpen, onClose, name, onConfirm, loading = false }: any) {
     return (
         <ModalBase isOpen={isOpen} onClose={onClose}>
             <div className="text-center space-y-6">
@@ -170,11 +301,19 @@ export function RemoveMemberModal({ isOpen, onClose, name, onConfirm }: any) {
                 </p>
 
                 <div className="flex gap-3 pt-4">
-                    <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-bold border border-gray-100 text-[#1F3A4A] hover:bg-gray-50 transition-colors">
+                    <button
+                      onClick={onClose}
+                      disabled={loading}
+                      className="flex-1 py-2.5 rounded-lg text-sm font-bold border border-gray-100 text-[#1F3A4A] hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
                         Cancel
                     </button>
-                    <button onClick={onConfirm} className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-[#1F3A4A] text-white hover:bg-[#2c4e62] transition-colors">
-                        Yes, Remove
+                    <button
+                      onClick={onConfirm}
+                      disabled={loading}
+                      className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-[#1F3A4A] text-white hover:bg-[#2c4e62] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        {loading ? "Removing..." : "Yes, Remove"}
                     </button>
                 </div>
             </div>

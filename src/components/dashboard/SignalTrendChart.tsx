@@ -2,23 +2,19 @@
 
 import React from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { getPeriodLabel } from "@/lib/reporting";
 
-const data = [
-  { name: "Week 1", oai: 40, mod: 75, csd: 55 },
-  { name: "Week 2", oai: 30, mod: 72, csd: 10 },
-  { name: "Week 3", oai: 15, mod: 12, csd: 5 },
-  { name: "Week 4", oai: 10, mod: 95, csd: 85 },
-  { name: "Week 5", oai: 35, mod: 55, csd: 60 },
-  { name: "Week 6", oai: 5, mod: 65, csd: 10 },
-];
+interface SignalTrendChartProps {
+  data: Array<{ name: string; oai: number; mod: number; csd: number }>;
+}
 
-export function SignalTrendChart() {
+export function SignalTrendChart({ data }: SignalTrendChartProps) {
   return (
     <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm h-[450px]">
       <div className="flex justify-between items-center mb-10">
         <div>
           <h3 className="text-base font-bold text-[#1F3A4A] mb-1">Signal Trend</h3>
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Last 6 Weeks</p>
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">{getPeriodLabel(data.length)}</p>
         </div>
       </div>
       

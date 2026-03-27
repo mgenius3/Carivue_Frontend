@@ -24,8 +24,29 @@ interface UnitOverviewProps {
 }
 
 export function UnitOverview({ units, onAddUnit }: UnitOverviewProps) {
-  const [activeUnitId, setActiveUnitId] = useState(units[0]?.id);
-  const activeUnit = units.find(u => u.id === activeUnitId) || units[0];
+  const [activeUnitId, setActiveUnitId] = useState<string | undefined>(units[0]?.id);
+  
+  // Safety check: if activeUnitId is not in the current units list, reset it to the first unit
+  const effectiveActiveUnitId = (activeUnitId && units.some(u => u.id === activeUnitId)) 
+    ? activeUnitId 
+    : units[0]?.id;
+
+  const activeUnit = units.find(u => u.id === effectiveActiveUnitId) || units[0];
+
+  if (!units.length || !activeUnit) {
+    return (
+      <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center justify-center min-h-[200px] mt-10">
+        <p className="text-gray-400 font-medium">No units found for this site.</p>
+        <button 
+          onClick={onAddUnit}
+          className="mt-4 flex items-center gap-2 text-primary font-bold text-sm hover:underline"
+        >
+          <Plus size={16} />
+          Add your first unit
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 mt-10">

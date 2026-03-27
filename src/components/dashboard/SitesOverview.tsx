@@ -16,6 +16,8 @@ interface SitesOverviewProps {
 }
 
 export function SitesOverview({ sites }: SitesOverviewProps) {
+  const strainedSitesCount = sites.filter((site) => site.status !== "Stable").length;
+
   return (
     <div className="bg-[#FAFBFD] p-8 rounded-3xl border border-gray-100/50 mt-10">
       <div className="flex justify-between items-center mb-8">
@@ -32,9 +34,7 @@ export function SitesOverview({ sites }: SitesOverviewProps) {
       <div className="flex gap-4 mb-8 text-sm font-bold text-[#1F3A4A]">
         <span>Total Sites: {sites.length}</span>
         <span className="text-gray-300">|</span>
-        <span>Total Residents: 132</span>
-        <span className="text-gray-300">|</span>
-        <span>Sites in Emerging/Elevated Strain: 2</span>
+        <span>Sites in Emerging/Elevated Strain: {strainedSitesCount}</span>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
