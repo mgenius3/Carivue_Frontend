@@ -114,7 +114,7 @@ export default function CreateOrganisationPage() {
         token: token || undefined,
       });
 
-      router.push('/dashboard');
+      router.push('/dashboard/executive');
     } catch (err: any) {
       setError(err.message);
     } finally {

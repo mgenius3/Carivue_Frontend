@@ -16,8 +16,8 @@ export default function SignUpPage() {
     firstName: '',
     lastName: '',
     email: '',
-    role: '',
-    proceedIntent: '',
+    role: 'executive',
+    proceedIntent: 'new_org',
     password: '',
     confirmPassword: '',
   });
@@ -61,7 +61,7 @@ export default function SignUpPage() {
       });
 
       localStorage.setItem('token', result.token);
-      router.push('/email-verified');
+      router.push('/signup-success');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -107,27 +107,6 @@ export default function SignUpPage() {
           required
         />
 
-        <RadioGroup
-          label="What is your Role?*"
-          name="role"
-          options={[
-            { label: 'Executive', value: 'executive' },
-            { label: 'Manager', value: 'manager' },
-          ]}
-          value={form.role}
-          onChange={(value) => handleChange('role', value)}
-        />
-
-        <RadioGroup
-          label="How would you like to proceed?*"
-          name="proceedIntent"
-          options={[
-            { label: "I'm setting up a new organisation", value: 'new_org' },
-            { label: "I'm joining an existing organisation", value: 'join_org' },
-          ]}
-          value={form.proceedIntent}
-          onChange={(value) => handleChange('proceedIntent', value)}
-        />
 
         <Input
           label="Password*"

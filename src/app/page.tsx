@@ -134,7 +134,7 @@ export default function Home() {
               Log in
             </Link>
             <Link
-              href="/#contact"
+              href="/signup"
               className="inline-flex items-center text-sm font-semibold bg-primary text-white px-5 py-2.5 rounded-md hover:bg-primary/90 transition shadow-sm"
             >
               Sign Up
@@ -166,7 +166,7 @@ export default function Home() {
               Carivue provides real-time operational visibility for care services, aggregating workforce signals and clinical indicators to highlight systemic risk and prevent operational failure.
             </p>
             <Link
-              href="#contact"
+              href="/signup"
               className="inline-flex items-center justify-center bg-primary text-white px-8 py-3.5 rounded-md font-semibold text-base hover:bg-primary/90 transition-all w-full sm:w-auto shadow-sm"
             >
               Get Started
@@ -406,7 +406,7 @@ export default function Home() {
                     ))}
                   </ul>
                   <Link
-                    href="#contact"
+                    href={plan.cta === "Get Started" ? "/signup" : "#contact"}
                     className={`block w-full text-center py-3.5 rounded-md font-semibold text-sm transition-all border ${plan.highlighted
                       ? "bg-[#1B2936] border-transparent text-white hover:bg-[#2c3d4f]"
                       : "bg-white border-primary text-primary hover:bg-gray-50"

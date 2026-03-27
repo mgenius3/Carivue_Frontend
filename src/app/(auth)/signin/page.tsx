@@ -24,7 +24,7 @@ export default function SignInPage() {
     setLoading(true);
 
     try {
-      const result = await apiFetch<{ token: string; user: { proceedIntent: string; organisationId: number | null } }>(
+      const result = await apiFetch<{ token: string; user: { proceedIntent: string; organisationId: number | null; emailVerified: boolean } }>(
         '/auth/signin',
         {
           method: 'POST',
@@ -34,13 +34,13 @@ export default function SignInPage() {
 
       localStorage.setItem('token', result.token);
 
-      // Route based on user state
-      if (result.user.organisationId) {
-        router.push('/dashboard');
-      } else if (result.user.proceedIntent === 'new_org') {
+      // smart redirection based on user state
+      if (!result.user.emailVerified) {
+        router.push('/verify-email');
+      } else if (!result.user.organisationId) {
         router.push('/create-organisation');
       } else {
-        router.push('/join-organisation');
+        router.push('/dashboard/executive');
       }
     } catch (err: any) {
       setError(err.message);
