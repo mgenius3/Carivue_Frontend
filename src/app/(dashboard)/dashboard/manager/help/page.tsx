@@ -3,6 +3,7 @@
 import React from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Accordion } from "@/components/dashboard/Accordion";
+import { AddUnitModal } from "@/components/dashboard/modals/AddUnitModal";
 import { Mail, Phone, MessageSquare } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -28,9 +29,16 @@ const faqItems = [
 export default function ManagerHelpPage() {
   const [feedback, setFeedback] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+  const [isAddUnitModalOpen, setIsAddUnitModalOpen] = React.useState(false);
+  const feedbackRef = React.useRef<HTMLTextAreaElement | null>(null);
 
   return (
-    <DashboardLayout title="Manager Dashboard" role="manager">
+    <DashboardLayout
+      title="Manager Dashboard"
+      role="manager"
+      primaryActionLabel="Add New Unit"
+      onPrimaryAction={() => setIsAddUnitModalOpen(true)}
+    >
       <div className="flex flex-col gap-10">
         <div>
           <h1 className="text-2xl font-bold text-[#1F3A4A] mb-1">Help & Support</h1>
@@ -76,6 +84,7 @@ export default function ManagerHelpPage() {
                   placeholder="Feedback" 
                   rows={5} 
                   required
+                  ref={feedbackRef}
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                   disabled={submitting}
@@ -83,7 +92,13 @@ export default function ManagerHelpPage() {
                 ></textarea>
               </div>
               <div className="flex justify-end gap-3">
-                <button type="button" className="px-6 py-2 rounded-lg text-xs font-bold text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100">Close</button>
+                <button
+                  type="button"
+                  onClick={() => setFeedback("")}
+                  className="px-6 py-2 rounded-lg text-xs font-bold text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100"
+                >
+                  Close
+                </button>
                 <button
                   type="submit"
                   disabled={submitting}
@@ -123,7 +138,11 @@ export default function ManagerHelpPage() {
                 </div>
               </div>
             </div>
-            <button className="w-full bg-[#1F3A4A] text-white py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-colors mt-12">
+            <button
+              type="button"
+              onClick={() => feedbackRef.current?.focus()}
+              className="w-full bg-[#1F3A4A] text-white py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-colors mt-12"
+            >
               Submit Feedback / Support Ticket
             </button>
           </div>
@@ -136,6 +155,10 @@ export default function ManagerHelpPage() {
           <button className="w-full mt-10 py-3 rounded-xl text-sm font-bold text-gray-400 border border-gray-100 bg-white/50 hover:bg-gray-50 transition-colors">View All FAQs</button>
         </div>
       </div>
+      <AddUnitModal
+        isOpen={isAddUnitModalOpen}
+        onClose={() => setIsAddUnitModalOpen(false)}
+      />
     </DashboardLayout>
   );
 }

@@ -3,6 +3,7 @@
 import React from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Accordion } from "@/components/dashboard/Accordion";
+import { AddSiteModal } from "@/components/dashboard/modals/AddSiteModal";
 import { Mail, Phone, MessageSquare } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -28,9 +29,15 @@ const faqItems = [
 export default function HelpSupportPage() {
   const [feedback, setFeedback] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+  const [isAddSiteModalOpen, setIsAddSiteModalOpen] = React.useState(false);
+  const feedbackRef = React.useRef<HTMLTextAreaElement | null>(null);
 
   return (
-    <DashboardLayout title="Executive Dashboard">
+    <DashboardLayout
+      title="Executive Dashboard"
+      primaryActionLabel="Add New Site"
+      onPrimaryAction={() => setIsAddSiteModalOpen(true)}
+    >
       <div className="flex flex-col gap-10">
         <div>
           <h1 className="text-2xl font-bold text-[#1F3A4A] mb-1">Help & Support</h1>
@@ -80,6 +87,7 @@ export default function HelpSupportPage() {
                   placeholder="Feedback" 
                   rows={5}
                   required
+                  ref={feedbackRef}
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                   disabled={submitting}
@@ -90,6 +98,7 @@ export default function HelpSupportPage() {
               <div className="flex justify-end gap-3">
                 <button 
                   type="button" 
+                  onClick={() => setFeedback("")}
                   className="px-6 py-2 rounded-lg text-xs font-bold text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100"
                 >
                   Close
@@ -143,7 +152,11 @@ export default function HelpSupportPage() {
               </div>
             </div>
 
-            <button className="w-full bg-[#1F3A4A] text-white py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-colors mt-12">
+            <button
+              type="button"
+              onClick={() => feedbackRef.current?.focus()}
+              className="w-full bg-[#1F3A4A] text-white py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-colors mt-12"
+            >
               Submit Feedback / Support Ticket
             </button>
           </div>
@@ -163,6 +176,10 @@ export default function HelpSupportPage() {
           </button>
         </div>
       </div>
+      <AddSiteModal
+        isOpen={isAddSiteModalOpen}
+        onClose={() => setIsAddSiteModalOpen(false)}
+      />
     </DashboardLayout>
   );
 }

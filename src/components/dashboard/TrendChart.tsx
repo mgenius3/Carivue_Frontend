@@ -17,14 +17,84 @@ interface TrendChartProps {
   data: any[];
   title?: string;
   periodLabel?: string;
+  variant?: "card" | "plain";
 }
 
 export function TrendChart({
   data,
   title = "Strain Trend",
   periodLabel,
+  variant = "card",
 }: TrendChartProps) {
   const resolvedPeriodLabel = periodLabel || getPeriodLabel(data.length);
+  const chart = (
+    <div className={variant === "card" ? "h-[300px] w-full" : "h-full min-h-[280px] w-full"}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F2F3F5" />
+          <XAxis
+            dataKey="name"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: '#9CA3AF', fontSize: 12 }}
+            dy={10}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: '#9CA3AF', fontSize: 12 }}
+            dx={-10}
+          />
+          <Tooltip
+            contentStyle={{
+              borderRadius: '12px',
+              border: 'none',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              padding: '12px'
+            }}
+          />
+          <Legend
+            verticalAlign="bottom"
+            align="center"
+            iconType="circle"
+            wrapperStyle={{ paddingTop: '20px' }}
+          />
+
+          <Line
+            type="monotone"
+            dataKey="csi"
+            name="CSI (%) - Carivue Stability Index"
+            stroke="#6366F1"
+            strokeWidth={3}
+            dot={{ r: 6, fill: '#6366F1', strokeWidth: 2, stroke: '#fff' }}
+            activeDot={{ r: 8, strokeWidth: 0 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="mod"
+            name="MOD (%) - Managerial Stabilisation"
+            stroke="#10B981"
+            strokeWidth={3}
+            dot={{ r: 6, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
+            activeDot={{ r: 8, strokeWidth: 0 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="csd"
+            name="CSD (%) - Clinical Stabilisation"
+            stroke="#F59E0B"
+            strokeWidth={3}
+            dot={{ r: 6, fill: '#F59E0B', strokeWidth: 2, stroke: '#fff' }}
+            activeDot={{ r: 8, strokeWidth: 0 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
+  if (variant === "plain") {
+    return chart;
+  }
 
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[400px]">
@@ -35,68 +105,7 @@ export function TrendChart({
         </div>
       </div>
 
-      <div className="h-[300px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F2F3F5" />
-            <XAxis 
-              dataKey="name" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fill: '#9CA3AF', fontSize: 12 }} 
-              dy={10}
-            />
-            <YAxis 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fill: '#9CA3AF', fontSize: 12 }} 
-              dx={-10}
-            />
-            <Tooltip 
-              contentStyle={{ 
-                borderRadius: '12px', 
-                border: 'none', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                padding: '12px'
-              }} 
-            />
-            <Legend 
-                verticalAlign="bottom" 
-                align="center" 
-                iconType="circle"
-                wrapperStyle={{ paddingTop: '20px' }}
-            />
-            
-            <Line
-              type="monotone"
-              dataKey="csi"
-              name="CSI (%) - Operational Load"
-              stroke="#6366F1"
-              strokeWidth={3}
-              dot={{ r: 6, fill: '#6366F1', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 8, strokeWidth: 0 }}
-            />
-            <Line
-              type="monotone"
-              dataKey="mod"
-              name="MOD (%) - Managerial Stabilisation"
-              stroke="#10B981"
-              strokeWidth={3}
-              dot={{ r: 6, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 8, strokeWidth: 0 }}
-            />
-            <Line
-              type="monotone"
-              dataKey="csd"
-              name="CSD (%) - Clinical Stabilisation"
-              stroke="#F59E0B"
-              strokeWidth={3}
-              dot={{ r: 6, fill: '#F59E0B', strokeWidth: 2, stroke: '#fff' }}
-              activeDot={{ r: 8, strokeWidth: 0 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      {chart}
     </div>
   );
 }

@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { AddSiteModal } from "@/components/dashboard/modals/AddSiteModal";
 import { Camera, Copy, Check, ChevronDown, Mail, Lock, Globe, Users, Trash2, Edit2, Plus } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { 
   InviteMemberModal, 
   StatusModal, 
-  EditMemberRoleModal, 
+  EditMemberRoleModal,
   RemoveMemberModal 
 } from "@/components/dashboard/TeamModals";
 import { apiFetch } from "@/lib/api";
@@ -21,10 +22,11 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile");
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [modalActionLoading, setModalActionLoading] = useState<null | "invite" | "remove">(null);
+  const [modalActionLoading, setModalActionLoading] = useState<null | "invite" | "edit" | "remove">(null);
   const [profile, setProfile] = useState<any>(null);
   const [teamRefreshKey, setTeamRefreshKey] = useState(0);
   const [inviteOptions, setInviteOptions] = useState<any>({ roleOptions: ["manager", "coordinator"], sites: [] });
+  const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
   
   // Modal States
   const [modalState, setModalState] = useState<{
@@ -61,9 +63,7 @@ export default function SettingsPage() {
   }, []);
 
   const handleCopy = () => {
-    if (!profile?.organisation_name) return;
-    const slug = profile.organisation_name.toLowerCase().replace(/\s+/g, '-');
-    navigator.clipboard.writeText(`${window.location.origin}/signal-input/${slug}`);
+    navigator.clipboard.writeText(`${window.location.origin}/signal-input`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -99,7 +99,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <DashboardLayout title="Executive Dashboard">
+    <DashboardLayout
+      title="Executive Dashboard"
+      primaryActionLabel="Add New Site"
+      onPrimaryAction={() => setIsAddSiteModalOpen(true)}
+    >
       <div className="flex flex-col gap-8">
         <div>
           <h1 className="text-2xl font-bold text-[#1F3A4A] mb-1">Settings</h1>
@@ -131,6 +135,11 @@ export default function SettingsPage() {
           {activeTab === "team" && <TeamMembersTab openModal={openModal} refreshKey={teamRefreshKey} />}
           {activeTab === "preferences" && <PreferencesTab />}
         </div>
+        <AddSiteModal
+          isOpen={isAddSiteModalOpen}
+          onClose={() => setIsAddSiteModalOpen(false)}
+          onCreated={fetchData}
+        />
       </div>
 
       {/* Global Modals */}
@@ -171,16 +180,37 @@ export default function SettingsPage() {
         roleOptions={inviteOptions}
         loading={modalActionLoading === "invite"}
       />
-
       <EditMemberRoleModal 
         isOpen={modalState.type === "edit" && modalState.isOpen} 
         onClose={closeModal}
-        name={modalState.data?.name}
-        onSave={() => openModal("status", null, {
-            type: "success",
-            title: "Changes Saved",
-            buttonText: "Awesome"
-        })}
+        member={modalState.data}
+        options={inviteOptions}
+        loading={modalActionLoading === "edit"}
+        onSave={async (data: any) => {
+          setModalActionLoading("edit");
+          try {
+            const token = localStorage.getItem('token');
+            await apiFetch(`/settings/team/${modalState.data.id}`, {
+              method: 'PUT',
+              body: JSON.stringify(data),
+              token: token || undefined
+            });
+            refreshTeamMembers();
+            await fetchData();
+            openModal("status", null, {
+              type: "success",
+              title: modalState.data?.status === "Pending" ? "Invitation Updated!" : "Access Updated!",
+              message: modalState.data?.status === "Pending"
+                ? `<b>${modalState.data?.email || 'Invitation'}</b> now has the updated access scope.`
+                : `<b>${modalState.data?.name || 'Team member'}</b> now has the updated access scope.`,
+              buttonText: "Done"
+            });
+          } catch (err: any) {
+            alert(err.message);
+          } finally {
+            setModalActionLoading(null);
+          }
+        }}
       />
 
       <RemoveMemberModal 
@@ -298,7 +328,11 @@ function PreferencesTab() {
         </section>
 
         <div className="flex gap-4 pt-10">
-          <button className="px-8 py-3 rounded-xl text-sm font-bold text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100">
+          <button
+            type="button"
+            onClick={() => setPreferences({ ...preferences, email_notifications: true, in_app_notifications: true, theme: "light", language: "en" })}
+            className="px-8 py-3 rounded-xl text-sm font-bold text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100"
+          >
             Reset to Defaults
           </button>
           <button
@@ -501,7 +535,47 @@ function SecurityTab() {
   );
 }
 
+const GENERAL_DEFAULTS = {
+  language: "English (US)",
+  timeZone: "West African Time (WAT)",
+  dateFormat: "DD/MM/YYYY",
+  autoLogoutTimer: "15 minutes",
+};
+
 function GeneralTab() {
+  const storageKey = "carivue:executive-general-settings";
+  const [settings, setSettings] = useState(GENERAL_DEFAULTS);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const storedSettings = localStorage.getItem(storageKey);
+    if (!storedSettings) return;
+
+    try {
+      const parsed = JSON.parse(storedSettings);
+      setSettings({ ...GENERAL_DEFAULTS, ...parsed });
+    } catch {
+      setSettings(GENERAL_DEFAULTS);
+    }
+  }, []);
+
+  const updateSetting = (key: keyof typeof GENERAL_DEFAULTS, value: string) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    localStorage.setItem(storageKey, JSON.stringify(settings));
+    window.dispatchEvent(new Event("carivue:general-settings-updated"));
+    setTimeout(() => setSaving(false), 250);
+  };
+
+  const handleReset = () => {
+    setSettings(GENERAL_DEFAULTS);
+    localStorage.removeItem(storageKey);
+    window.dispatchEvent(new Event("carivue:general-settings-updated"));
+  };
+
   return (
     <div className="space-y-10 animate-fade-in">
       <div>
@@ -518,38 +592,47 @@ function GeneralTab() {
                    <p className="text-sm font-bold text-[#1F3A4A]">Default Language</p>
                    <p className="text-xs text-gray-400 font-medium">Set the default language for the system</p>
                 </div>
-                <SelectPlain value="English (US)" options={["English (US)", "English (UK)", "French"]} />
+                <SelectPlain value={settings.language} options={["English (US)", "English (UK)", "French"]} onChange={(value: string) => updateSetting("language", value)} />
              </div>
              <div className="flex items-center justify-between py-2 border-b border-gray-50">
                 <div>
                    <p className="text-sm font-bold text-[#1F3A4A]">Time Zone</p>
                    <p className="text-xs text-gray-400 font-medium">Set the default time zone for the system</p>
                 </div>
-                <SelectPlain value="West African Time (WAT)" options={["West African Time (WAT)", "GMT", "UTC"]} />
+                <SelectPlain value={settings.timeZone} options={["West African Time (WAT)", "GMT", "UTC"]} onChange={(value: string) => updateSetting("timeZone", value)} />
              </div>
              <div className="flex items-center justify-between py-2 border-b border-gray-50">
                 <div>
                    <p className="text-sm font-bold text-[#1F3A4A]">Date Format</p>
                    <p className="text-xs text-gray-400 font-medium">Set the default date format</p>
                 </div>
-                <SelectPlain value="DD/MM/YYYY" options={["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]} />
+                <SelectPlain value={settings.dateFormat} options={["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]} onChange={(value: string) => updateSetting("dateFormat", value)} />
              </div>
              <div className="flex items-center justify-between py-2 border-b border-gray-50">
                 <div>
                    <p className="text-sm font-bold text-[#1F3A4A]">Auto-logout Timer</p>
                    <p className="text-xs text-gray-400 font-medium">Set the time of inactivity before automatic logout</p>
                 </div>
-                <SelectPlain value="15 minutes" options={["15 minutes", "30 minutes", "1 hour"]} />
+                <SelectPlain value={settings.autoLogoutTimer} options={["15 minutes", "30 minutes", "1 hour"]} onChange={(value: string) => updateSetting("autoLogoutTimer", value)} />
              </div>
           </div>
         </section>
 
         <div className="flex justify-end gap-4 pt-4">
-          <button className="px-8 py-3 rounded-xl text-sm font-bold text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100">
+          <button
+            type="button"
+            onClick={handleReset}
+            className="px-8 py-3 rounded-xl text-sm font-bold text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100"
+          >
             Reset to Defaults
           </button>
-          <button className="bg-[#1F3A4A] text-white px-10 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-all">
-            Save Changes
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-[#1F3A4A] text-white px-10 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>
@@ -603,6 +686,7 @@ function TeamMembersTab({ openModal, refreshKey }: { openModal: any; refreshKey:
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name</th>
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email Address</th>
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Role</th>
+              <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Access</th>
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
               <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actions</th>
             </tr>
@@ -614,6 +698,15 @@ function TeamMembersTab({ openModal, refreshKey }: { openModal: any; refreshKey:
                 <td className="py-5 text-sm font-bold text-[#1F3A4A]">{member.name || (member.first_name ? `${member.first_name} ${member.last_name}` : "Pending Invite")}</td>
                 <td className="py-5 text-sm font-medium text-gray-400">{member.email}</td>
                 <td className="py-5 text-sm font-medium text-gray-500 uppercase">{member.role}</td>
+                <td className="py-5 text-sm font-medium text-gray-400">
+                  {Array.isArray(member.scopeLabels) && member.scopeLabels.length > 0
+                    ? member.scopeLabels.join(", ")
+                    : member.role === "manager"
+                      ? "No sites assigned"
+                      : member.role === "coordinator"
+                        ? "No units assigned"
+                        : "Organisation access"}
+                </td>
                 <td className="py-5">
                    <span className={cn(
                      "text-[10px] font-bold px-3 py-1 rounded-md uppercase tracking-wide",
@@ -624,12 +717,14 @@ function TeamMembersTab({ openModal, refreshKey }: { openModal: any; refreshKey:
                 </td>
                 <td className="py-5">
                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => openModal("edit", member)}
-                        className="p-2 text-gray-400 hover:text-primary transition-colors border border-transparent hover:border-gray-100 rounded-lg"
-                      >
-                        <Edit2 size={16} />
-                      </button>
+                      {(member.role === "manager" || member.role === "coordinator") && (
+                        <button 
+                          onClick={() => openModal("edit", member)}
+                          className="p-2 text-gray-400 hover:text-primary transition-colors border border-transparent hover:border-gray-100 rounded-lg"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      )}
                       <button 
                         onClick={() => openModal("remove", member)}
                         className="p-2 text-red-400 hover:text-red-500 transition-colors border border-transparent hover:border-red-50 rounded-lg"
@@ -681,10 +776,14 @@ function Select({ label, value, options }: any) {
   );
 }
 
-function SelectPlain({ value, options }: any) {
+function SelectPlain({ value, options, onChange }: any) {
   return (
     <div className="relative min-w-[200px]">
-      <select className="appearance-none w-full border border-gray-100 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all text-xs font-bold text-gray-500 pr-10 shadow-sm">
+      <select
+        value={value}
+        onChange={(event) => onChange?.(event.target.value)}
+        className="appearance-none w-full border border-gray-100 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all text-xs font-bold text-gray-500 pr-10 shadow-sm"
+      >
         {options.map((opt: any) => <option key={opt} value={opt}>{opt}</option>)}
       </select>
       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />

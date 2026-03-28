@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { CircularProgress } from "./CircularProgress";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -11,20 +11,23 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface Unit {
-  id: string;
+  id: string | number;
   name: string;
   strain: number;
   status: string;
   highlights: string[];
+  minCapacity?: number;
+  maxCapacity?: number;
 }
 
 interface UnitOverviewProps {
   units: Unit[];
   onAddUnit?: () => void;
+  onEditUnit?: (unit: Unit) => void;
 }
 
-export function UnitOverview({ units, onAddUnit }: UnitOverviewProps) {
-  const [activeUnitId, setActiveUnitId] = useState<string | undefined>(units[0]?.id);
+export function UnitOverview({ units, onAddUnit, onEditUnit }: UnitOverviewProps) {
+  const [activeUnitId, setActiveUnitId] = useState<string | number | undefined>(units[0]?.id);
   
   // Safety check: if activeUnitId is not in the current units list, reset it to the first unit
   const effectiveActiveUnitId = (activeUnitId && units.some(u => u.id === activeUnitId)) 
@@ -55,13 +58,24 @@ export function UnitOverview({ units, onAddUnit }: UnitOverviewProps) {
           <h2 className="text-xl font-bold text-[#1F3A4A] mb-1">Unit Overview</h2>
           <p className="text-sm text-gray-400 font-medium">Unit Stability Overview</p>
         </div>
-        <button 
-          onClick={onAddUnit}
-          className="flex items-center gap-2 bg-[#1F3A4A] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#2c4e62] transition-colors shadow-sm"
-        >
-          <Plus size={18} />
-          Add New Unit
-        </button>
+        <div className="flex items-center gap-3">
+          {onEditUnit && activeUnit && (
+            <button
+              onClick={() => onEditUnit(activeUnit)}
+              className="flex items-center gap-2 bg-white border border-gray-100 text-[#1F3A4A] px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              <Pencil size={16} />
+              Edit Unit
+            </button>
+          )}
+          <button
+            onClick={onAddUnit}
+            className="flex items-center gap-2 bg-[#1F3A4A] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#2c4e62] transition-colors shadow-sm"
+          >
+            <Plus size={18} />
+            Add New Unit
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

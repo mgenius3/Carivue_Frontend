@@ -11,13 +11,12 @@ interface StrainDistributionItem {
 
 interface StrainDistributionChartProps {
   data: StrainDistributionItem[];
+  variant?: "card" | "plain";
 }
 
-export function StrainDistributionChart({ data }: StrainDistributionChartProps) {
-  return (
-    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm h-full flex flex-col items-center">
-      <h2 className="text-base font-bold text-[#1F3A4A] mb-8">Strain Distribution</h2>
-      
+export function StrainDistributionChart({ data, variant = "card" }: StrainDistributionChartProps) {
+  const chart = (
+    <>
       <div className="h-[200px] w-full relative">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
@@ -35,7 +34,7 @@ export function StrainDistributionChart({ data }: StrainDistributionChartProps) 
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip 
+              <Tooltip
                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
               />
             </PieChart>
@@ -55,6 +54,17 @@ export function StrainDistributionChart({ data }: StrainDistributionChartProps) 
           </div>
         ))}
       </div>
+    </>
+  );
+
+  if (variant === "plain") {
+    return <div className="flex h-full flex-col items-center">{chart}</div>;
+  }
+
+  return (
+    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm h-full flex flex-col items-center">
+      <h2 className="text-base font-bold text-[#1F3A4A] mb-8">Strain Distribution</h2>
+      {chart}
     </div>
   );
 }

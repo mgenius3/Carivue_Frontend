@@ -247,36 +247,131 @@ export function StatusModal({ isOpen, onClose, type, title, message, buttonText 
     );
 }
 
-// 3. Edit Team Member's Role
-export function EditMemberRoleModal({ isOpen, onClose, name, onSave }: any) {
+// 3. Edit Team Member Access
+export function EditMemberRoleModal({ isOpen, onClose, member, options, onSave, loading = false }: any) {
+    const sites = Array.isArray(options?.sites) ? options.sites : [];
+    const [selectedSiteIds, setSelectedSiteIds] = React.useState<number[]>([]);
+    const [selectedUnitIds, setSelectedUnitIds] = React.useState<number[]>([]);
+
+    React.useEffect(() => {
+      if (!isOpen || !member) return;
+      setSelectedSiteIds(Array.isArray(member.siteIds) ? member.siteIds.map((id: any) => Number(id)) : []);
+      setSelectedUnitIds(Array.isArray(member.unitIds) ? member.unitIds.map((id: any) => Number(id)) : []);
+    }, [isOpen, member]);
+
+    const normalizedRole = String(member?.role || "").toLowerCase();
+    const displayRole = normalizedRole === "coordinator" ? "Care Coordinator" : "Manager";
+
+    const toggleSite = (siteId: number) => {
+      setSelectedSiteIds((prev) =>
+        prev.includes(siteId) ? prev.filter((id) => id !== siteId) : [...prev, siteId]
+      );
+    };
+
+    const toggleUnit = (unitId: number) => {
+      setSelectedUnitIds((prev) =>
+        prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId]
+      );
+    };
+
+    const handleSubmit = async () => {
+      if (normalizedRole === "manager" && selectedSiteIds.length === 0) return;
+      if (normalizedRole === "coordinator" && selectedUnitIds.length === 0) return;
+
+      await onSave({
+        siteIds: selectedSiteIds,
+        unitIds: selectedUnitIds,
+      });
+    };
+
     return (
         <ModalBase isOpen={isOpen} onClose={onClose}>
             <div className="text-center space-y-6">
-                <h2 className="text-xl font-bold text-[#1F3A4A]">Edit Team Member&apos;s Role</h2>
+                <h2 className="text-xl font-bold text-[#1F3A4A]">Edit Team Member Access</h2>
                 <div className="flex justify-center">
                     <div className="p-4 bg-[#1F3A4A] rounded-xl text-white">
                         <UserPlus size={24} />
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">Edit {name}&apos;s role</p>
-                    <div className="space-y-1.5 text-left">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Assign role</label>
-                        <select className="w-full border border-gray-100 rounded-lg px-4 py-2.5 text-sm bg-gray-50/50 focus:outline-none">
-                            <option>Manager</option>
-                            <option>Executive</option>
-                            <option>Care Coordinator</option>
-                        </select>
+                <div className="space-y-4 text-left">
+                    <div>
+                      <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">Update {member?.name || member?.email}&apos;s access</p>
                     </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Assigned role</label>
+                        <div className="w-full border border-gray-100 rounded-lg px-4 py-2.5 text-sm bg-gray-50/50 text-[#1F3A4A] font-bold">
+                          {displayRole}
+                        </div>
+                    </div>
+
+                    {normalizedRole === "manager" && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Assigned Sites</label>
+                        <div className="max-h-44 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 p-3 space-y-2">
+                          {sites.length === 0 && <p className="text-xs text-gray-400">No sites available to assign.</p>}
+                          {sites.map((site: any) => (
+                            <label key={site.id} className="flex items-center gap-2 text-sm text-[#1F3A4A]">
+                              <input
+                                type="checkbox"
+                                checked={selectedSiteIds.includes(Number(site.id))}
+                                onChange={() => toggleSite(Number(site.id))}
+                                disabled={loading}
+                                className="accent-primary"
+                              />
+                              <span>{site.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {normalizedRole === "coordinator" && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Assigned Units</label>
+                        <div className="max-h-56 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 p-3 space-y-3">
+                          {sites.length === 0 && <p className="text-xs text-gray-400">No units available to assign.</p>}
+                          {sites.map((site: any) => (
+                            <div key={site.id}>
+                              <p className="text-xs font-bold text-[#1F3A4A] uppercase tracking-wide mb-2">{site.name}</p>
+                              <div className="space-y-2">
+                                {(site.units || []).length === 0 && (
+                                  <p className="text-xs text-gray-400">No units under this site.</p>
+                                )}
+                                {(site.units || []).map((unit: any) => (
+                                  <label key={unit.id} className="flex items-center gap-2 text-sm text-[#1F3A4A]">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedUnitIds.includes(Number(unit.id))}
+                                      onChange={() => toggleUnit(Number(unit.id))}
+                                      disabled={loading}
+                                      className="accent-primary"
+                                    />
+                                    <span>{unit.name}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                    <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-bold border border-gray-100 text-[#1F3A4A] hover:bg-gray-50 transition-colors">
+                    <button
+                      onClick={onClose}
+                      disabled={loading}
+                      className="flex-1 py-2.5 rounded-lg text-sm font-bold border border-gray-100 text-[#1F3A4A] hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
                         Cancel
                     </button>
-                    <button onClick={onSave} className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-[#1F3A4A] text-white hover:bg-[#2c4e62] transition-colors">
-                        Save Changes
+                    <button
+                      onClick={handleSubmit}
+                      disabled={loading}
+                      className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-[#1F3A4A] text-white hover:bg-[#2c4e62] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        {loading ? "Saving..." : "Save Changes"}
                     </button>
                 </div>
             </div>

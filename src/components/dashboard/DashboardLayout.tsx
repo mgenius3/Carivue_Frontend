@@ -9,14 +9,16 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
   title: string;
   role?: "executive" | "manager";
-  onAddOrg?: () => void;
+  primaryActionLabel?: string;
+  onPrimaryAction?: () => void;
 }
 
 export function DashboardLayout({ 
   children, 
   title, 
   role = "executive",
-  onAddOrg
+  primaryActionLabel,
+  onPrimaryAction
 }: DashboardLayoutProps) {
   const [profile, setProfile] = useState<{
     first_name?: string;
@@ -56,7 +58,8 @@ export function DashboardLayout({
           role={role.charAt(0).toUpperCase() + role.slice(1)} 
           userName={userName || undefined}
           orgName={profile?.organisation_name || undefined}
-          onAddOrg={onAddOrg}
+          primaryActionLabel={primaryActionLabel}
+          onPrimaryAction={onPrimaryAction}
         />
 
         {/* Content */}

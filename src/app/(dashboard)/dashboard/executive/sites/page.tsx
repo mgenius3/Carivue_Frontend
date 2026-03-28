@@ -13,7 +13,9 @@ import { StrainDistributionChart } from "@/components/dashboard/StrainDistributi
 import { UnitOverview } from "@/components/dashboard/UnitOverview";
 import { AddUnitModal } from "@/components/dashboard/modals/AddUnitModal";
 import { AddSiteModal } from "@/components/dashboard/modals/AddSiteModal";
-import { Calendar, Download, RefreshCw, Plus } from "lucide-react";
+import { EditSiteModal } from "@/components/dashboard/modals/EditSiteModal";
+import { EditUnitModal } from "@/components/dashboard/modals/EditUnitModal";
+import { Calendar, Download, RefreshCw, Plus, Pencil } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 export default function SitesPage() {
@@ -21,6 +23,9 @@ export default function SitesPage() {
   const [activeSiteId, setActiveSiteId] = useState("all");
   const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
   const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
+  const [isEditSiteModalOpen, setIsEditSiteModalOpen] = useState(false);
+  const [isEditUnitModalOpen, setIsEditUnitModalOpen] = useState(false);
+  const [editingUnit, setEditingUnit] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [sites, setSites] = useState<any[]>([]);
   const [siteDetail, setSiteDetail] = useState<any>(null);
@@ -85,7 +90,11 @@ export default function SitesPage() {
   };
 
   return (
-    <DashboardLayout title="Executive Dashboard">
+    <DashboardLayout
+      title="Executive Dashboard"
+      primaryActionLabel="Add New Site"
+      onPrimaryAction={() => setIsAddSiteModalOpen(true)}
+    >
       <div className="flex flex-col gap-8">
         <div>
           <h1 className="text-2xl font-bold text-[#1F3A4A] mb-1">Sites</h1>
@@ -173,6 +182,13 @@ export default function SitesPage() {
               </div>
 
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsEditSiteModalOpen(true)}
+                  className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors"
+                >
+                  <Pencil size={14} className="text-gray-400" />
+                  Edit Site
+                </button>
                 <button className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors">
                   <Calendar size={14} className="text-gray-400" />
                   Current Week
@@ -242,7 +258,7 @@ export default function SitesPage() {
                   csi: parseFloat(t.csi) || 0,
                   mod: parseFloat(t.mod_val) || 0,
                   csd: parseFloat(t.csd) || 0
-                }))} />
+                }))} variant="plain" />
             </div>
 
             {/* Unit Overview */}
@@ -252,6 +268,8 @@ export default function SitesPage() {
                   name: u.name,
                   strain: parseFloat(u.csi),
                   status: statusMap[u.status] || "Stable",
+                  minCapacity: Number(u.min_capacity) || 0,
+                  maxCapacity: Number(u.max_capacity) || 0,
                   highlights: [
                     `${u.oai}% Operational Load`,
                     `${u.mod_val}% Managerial Overrides`,
@@ -259,6 +277,10 @@ export default function SitesPage() {
                   ]
                 })) || []} 
                 onAddUnit={() => setIsAddUnitModalOpen(true)}
+                onEditUnit={(unit) => {
+                  setEditingUnit(unit);
+                  setIsEditUnitModalOpen(true);
+                }}
             />
           </div>
         )}
@@ -267,11 +289,30 @@ export default function SitesPage() {
       <AddUnitModal 
         isOpen={isAddUnitModalOpen} 
         onClose={() => setIsAddUnitModalOpen(false)} 
+        onCreated={fetchData}
+        preferredSiteId={activeSiteId === "all" ? null : Number(activeSiteId)}
       />
       
       <AddSiteModal 
         isOpen={isAddSiteModalOpen} 
         onClose={() => setIsAddSiteModalOpen(false)} 
+        onCreated={() => {
+          setActiveSiteId("all");
+        }}
+      />
+
+      <EditSiteModal
+        isOpen={isEditSiteModalOpen}
+        onClose={() => setIsEditSiteModalOpen(false)}
+        site={siteDetail}
+        onUpdated={fetchData}
+      />
+
+      <EditUnitModal
+        isOpen={isEditUnitModalOpen}
+        onClose={() => setIsEditUnitModalOpen(false)}
+        unit={editingUnit}
+        onUpdated={fetchData}
       />
     </DashboardLayout>
   );

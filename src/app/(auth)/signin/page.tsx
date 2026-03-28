@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CarivueLogo } from '@/components/ui/CarivueLogo';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -11,12 +11,22 @@ import { Eye, EyeOff } from 'lucide-react';
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const nextPath = searchParams.get('next');
+
+  const resolveNextPath = () => {
+    if (nextPath && nextPath.startsWith('/')) {
+      return nextPath;
+    }
+
+    return null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +50,12 @@ export default function SignInPage() {
       } else if (!result.user.organisationId) {
         router.push('/create-organisation');
       } else {
+        const safeNextPath = resolveNextPath();
+        if (safeNextPath) {
+          router.push(safeNextPath);
+          return;
+        }
+
         // Role-based redirection
         const role = (result.user.role || 'executive').toLowerCase();
         if (role === 'executive') {

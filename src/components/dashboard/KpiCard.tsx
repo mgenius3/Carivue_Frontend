@@ -74,7 +74,7 @@ export function KpiCard({
           )}
         </div>
 
-        <div className="absolute right-0 bottom-0 w-1/2 h-2/3 opacity-40 group-hover:opacity-60 transition-opacity">
+        <div className="pointer-events-none absolute bottom-3 right-3 h-[58%] w-[42%] opacity-30 transition-opacity group-hover:opacity-45">
           {data ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
@@ -101,7 +101,7 @@ export function KpiCard({
       </div>
       
       {!data && children && (
-        <div className="mt-2 flex justify-center w-full">
+        <div className="mt-2 flex w-full justify-center">
             {children}
         </div>
       )}

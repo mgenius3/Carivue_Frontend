@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { GaugeChart } from "@/components/dashboard/GaugeChart";
@@ -9,13 +9,20 @@ import { TrendChart } from "@/components/dashboard/TrendChart";
 import { SignalTrendChart } from "@/components/dashboard/SignalTrendChart";
 import { Calendar, Download, RefreshCw } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { downloadCsv } from "@/lib/export";
+import { getRecentWeekEndingOptions } from "@/lib/reporting";
+import { AddSiteModal } from "@/components/dashboard/modals/AddSiteModal";
 
 export default function ReportsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentWeekEnding = getRecentWeekEndingOptions(1)[0];
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [sites, setSites] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [showCurrentWeekOnly, setShowCurrentWeekOnly] = useState(searchParams.get("view") === "current-week");
+  const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -46,6 +53,47 @@ export default function ReportsPage() {
     fetchData();
   }, []);
 
+  const visibleHistory = showCurrentWeekOnly
+    ? history.filter((item) => String(item.week_ending).slice(0, 10) === currentWeekEnding)
+    : history;
+
+  const handleExport = () => {
+    if (!data) {
+      return;
+    }
+
+    downloadCsv(
+      "executive-report.csv",
+      [
+        {
+          scope: "organisation",
+          reporting_week: new Date(data.current.week_ending || currentWeekEnding).toLocaleDateString(),
+          csi: data.current.csi,
+          oai: data.current.oai,
+          mod: data.current.mod_val,
+          csd: data.current.csd,
+          status: data.current.status,
+        },
+        ...sites.map((site) => ({
+          scope: "site",
+          site: site.name,
+          csi: site.csi,
+          status: site.status,
+          dominant_layer: site.dominant_layer || "",
+        })),
+        ...visibleHistory.map((item) => ({
+          scope: "submission",
+          site: item.site_name,
+          unit: item.unit_name,
+          week_ending: new Date(item.week_ending).toLocaleDateString(),
+          submitted_by: item.submitted_by,
+          activity: item.activity_type || "Submitted",
+          time: item.time,
+        })),
+      ]
+    );
+  };
+
   if (loading || !data) {
     return (
       <DashboardLayout title="Executive Dashboard">
@@ -71,7 +119,11 @@ export default function ReportsPage() {
   };
 
   return (
-    <DashboardLayout title="Executive Dashboard">
+    <DashboardLayout
+      title="Executive Dashboard"
+      primaryActionLabel="Add New Site"
+      onPrimaryAction={() => setIsAddSiteModalOpen(true)}
+    >
       <div className="flex flex-col gap-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -82,16 +134,26 @@ export default function ReportsPage() {
             </p>
           </div>
           
-          <button className="bg-[#1F3A4A] text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-colors shrink-0">
+          <button
+            onClick={handleExport}
+            className="bg-[#1F3A4A] text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg hover:bg-[#2c4e62] transition-colors shrink-0"
+          >
             Download Report
           </button>
         </div>
 
         {/* Action Bar */}
         <div className="flex justify-end items-center gap-3">
-            <button className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors">
-              <Calendar size={14} className="text-gray-400" />
-              Current Week
+            <button
+              onClick={() => setShowCurrentWeekOnly((current) => !current)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors ${
+                showCurrentWeekOnly
+                  ? "border border-[#1F3A4A] bg-[#1F3A4A] text-white"
+                  : "border border-gray-100 bg-white text-[#1F3A4A] hover:bg-gray-50"
+              }`}
+            >
+              <Calendar size={14} className={showCurrentWeekOnly ? "text-white" : "text-gray-400"} />
+              {showCurrentWeekOnly ? "Showing Current Week" : "Current Week Only"}
             </button>
             <button 
               onClick={fetchData}
@@ -153,7 +215,7 @@ export default function ReportsPage() {
               csi: parseFloat(t.csi),
               mod: parseFloat(t.mod_val),
               csd: parseFloat(t.csd)
-            }))} />
+            }))} variant="plain" />
         </div>
 
         {/* Site Comparison Table */}
@@ -201,11 +263,12 @@ export default function ReportsPage() {
                 <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Floor/Unit</th>
                 <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Week Ending</th>
                 <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Submitted By</th>
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Activity</th>
                 <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Time</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {history.map((item, i) => (
+              {visibleHistory.map((item, i) => (
                 <tr key={i} className="hover:bg-gray-50/50 transition-colors">
                   <td className="py-4 text-sm font-bold text-[#1F3A4A]">{item.site_name}</td>
                   <td className="py-4 text-sm font-medium text-gray-400">{item.unit_name}</td>
@@ -213,18 +276,26 @@ export default function ReportsPage() {
                     {new Date(item.week_ending).toLocaleDateString()}
                   </td>
                   <td className="py-4 text-sm font-bold text-[#1F3A4A]">{item.submitted_by}</td>
+                  <td className="py-4 text-sm font-bold text-[#1F3A4A]">{item.activity_type || 'Submitted'}</td>
                   <td className="py-4 text-sm font-bold text-[#1F3A4A]">{item.time}</td>
                 </tr>
               ))}
-              {history.length === 0 && (
+              {visibleHistory.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-sm text-gray-400">No submissions found</td>
+                  <td colSpan={6} className="py-10 text-center text-sm text-gray-400">
+                    {showCurrentWeekOnly ? "No submissions found for the current reporting week" : "No submissions found"}
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+      <AddSiteModal
+        isOpen={isAddSiteModalOpen}
+        onClose={() => setIsAddSiteModalOpen(false)}
+        onCreated={fetchData}
+      />
     </DashboardLayout>
   );
 }

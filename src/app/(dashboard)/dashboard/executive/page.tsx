@@ -11,9 +11,9 @@ import { OperationalReview } from "@/components/dashboard/OperationalReview";
 import { SignalSubmission } from "@/components/dashboard/SignalSubmission";
 import { Calendar, Download, RefreshCw } from "lucide-react";
 import { AddSiteModal } from "@/components/dashboard/modals/AddSiteModal";
-import { AddOrgModal } from "@/components/dashboard/modals/AddOrgModal";
 import { ScoreExplanationModal } from "@/components/dashboard/modals/ScoreExplanationModal";
 import { apiFetch } from "@/lib/api";
+import { downloadCsv } from "@/lib/export";
 
 export default function ExecutiveDashboard() {
   const router = useRouter();
@@ -22,7 +22,6 @@ export default function ExecutiveDashboard() {
   const [sites, setSites] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
-  const [isAddOrgModalOpen, setIsAddOrgModalOpen] = useState(false);
   const [explanationModal, setExplanationModal] = useState<{ isOpen: boolean; type: "CSI" | "OAI" | "MOD" | "CSD" }>({
     isOpen: false,
     type: "CSI"
@@ -68,6 +67,43 @@ export default function ExecutiveDashboard() {
 
   const openExplanation = (type: "CSI" | "OAI" | "MOD" | "CSD") => {
     setExplanationModal({ isOpen: true, type });
+  };
+
+  const handleExport = () => {
+    if (!overview) {
+      return;
+    }
+
+    downloadCsv(
+      "executive-dashboard-summary.csv",
+      [
+        {
+          scope: "organisation",
+          reporting_week: new Date(current.week_ending).toLocaleDateString(),
+          csi: current.csi,
+          oai: current.oai,
+          mod: current.mod_val,
+          csd: current.csd,
+          status: current.status,
+        },
+        ...sites.map((site) => ({
+          scope: "site",
+          site: site.name,
+          csi: site.csi,
+          status: site.status,
+          dominant_layer: site.dominant_layer || "",
+        })),
+        ...history.slice(0, 10).map((item: any) => ({
+          scope: "recent_submission",
+          site: item.site_name,
+          unit: item.unit_name,
+          week_ending: new Date(item.week_ending).toLocaleDateString(),
+          submitted_by: item.submitted_by,
+          activity: item.activity_type || "Submitted",
+          time: item.time,
+        })),
+      ]
+    );
   };
 
   if (loading || !overview) {
@@ -119,15 +155,16 @@ export default function ExecutiveDashboard() {
 
   const recentSubmissionItems = history.slice(0, 5).map((item: any) => ({
     name: `${item.site_name} - ${item.unit_name}`,
-    status: "Submitted",
-    variant: "success" as const,
+    status: item.activity_type || "Submitted",
+    variant: item.activity_type === "Updated" ? ("warning" as const) : ("success" as const),
     detail: `${new Date(item.week_ending).toLocaleDateString()} at ${item.time} by ${item.submitted_by}`,
   }));
 
   return (
     <DashboardLayout 
       title="Executive Dashboard" 
-      onAddOrg={() => setIsAddOrgModalOpen(true)}
+      primaryActionLabel="Add New Site"
+      onPrimaryAction={() => setIsAddSiteModalOpen(true)}
     >
       <div className="flex flex-col gap-8">
         {/* Header Section */}
@@ -140,11 +177,17 @@ export default function ExecutiveDashboard() {
           </div>
           
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-semibold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors">
+            <button
+              onClick={() => router.push("/dashboard/executive/reports?view=current-week")}
+              className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-semibold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors"
+            >
               <Calendar size={14} className="text-gray-400" />
               Current Week
             </button>
-            <button className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-semibold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-semibold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors"
+            >
               <Download size={14} className="text-gray-400" />
               Export
             </button>
@@ -236,8 +279,11 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* Modals */}
-      <AddSiteModal isOpen={isAddSiteModalOpen} onClose={() => setIsAddSiteModalOpen(false)} />
-      <AddOrgModal isOpen={isAddOrgModalOpen} onClose={() => setIsAddOrgModalOpen(false)} />
+      <AddSiteModal
+        isOpen={isAddSiteModalOpen}
+        onClose={() => setIsAddSiteModalOpen(false)}
+        onCreated={fetchData}
+      />
       <ScoreExplanationModal 
         isOpen={explanationModal.isOpen} 
         onClose={() => setExplanationModal({ ...explanationModal, isOpen: false })} 

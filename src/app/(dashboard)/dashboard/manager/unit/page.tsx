@@ -7,7 +7,9 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { GaugeChart } from "@/components/dashboard/GaugeChart";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { StrainDistributionChart } from "@/components/dashboard/StrainDistributionChart";
-import { Plus, Calendar, Download, RefreshCw, AlertTriangle, Zap, Activity } from "lucide-react";
+import { AddUnitModal } from "@/components/dashboard/modals/AddUnitModal";
+import { EditUnitModal } from "@/components/dashboard/modals/EditUnitModal";
+import { Plus, Calendar, Download, RefreshCw, AlertTriangle, Zap, Activity, Pencil } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 function UnitDashboardContent() {
@@ -22,6 +24,8 @@ function UnitDashboardContent() {
   const [availableSites, setAvailableSites] = useState<any[]>([]);
   const [activeSiteId, setActiveSiteId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [isEditUnitModalOpen, setIsEditUnitModalOpen] = useState(false);
+  const [editingUnit, setEditingUnit] = useState<any>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -221,6 +225,15 @@ function UnitDashboardContent() {
                 >
                   View More Details
                 </button>
+                <button
+                  onClick={() => {
+                    setEditingUnit(unit);
+                    setIsEditUnitModalOpen(true);
+                  }}
+                  className="bg-white border border-gray-100 text-[#1F3A4A] px-6 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-gray-50 transition-colors"
+                >
+                  Edit Unit
+                </button>
               </div>
             ))}
           </div>
@@ -234,6 +247,16 @@ function UnitDashboardContent() {
                 <h2 className="text-lg font-bold text-[#1F3A4A] mb-1">{selectedUnit.name}</h2>
                 <p className="text-sm text-gray-400 font-medium">Reporting Period: {new Date(selectedUnit.week_ending).toLocaleDateString()}</p>
               </div>
+              <button
+                onClick={() => {
+                  setEditingUnit(selectedUnit);
+                  setIsEditUnitModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors"
+              >
+                <Pencil size={14} className="text-gray-400" />
+                Edit Unit
+              </button>
             </div>
 
             {/* KPI Cards */}
@@ -281,7 +304,7 @@ function UnitDashboardContent() {
                 csi: parseFloat(t.csi) || 0,
                 mod: parseFloat(t.mod_val) || 0,
                 csd: parseFloat(t.csd) || 0
-              }))} />
+              }))} variant="plain" />
             </div>
 
             <div className="grid md:grid-cols-2 gap-8">
@@ -314,19 +337,34 @@ function UnitDashboardContent() {
                     { name: "Managerial Effort", value: Number(selectedUnit.mod_val), color: "#1F3A4A" },
                     { name: "Clinical Load", value: Number(selectedUnit.csd), color: "#D1D5DB" },
                   ]}
+                  variant="plain"
                 />
               </div>
             </div>
           </div>
         )
       )}
+
+      <EditUnitModal
+        isOpen={isEditUnitModalOpen}
+        onClose={() => setIsEditUnitModalOpen(false)}
+        unit={editingUnit}
+        onUpdated={fetchData}
+      />
     </div>
   );
 }
 
 export default function ManagerUnitPage() {
+  const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
+
   return (
-    <DashboardLayout title="Manager Dashboard" role="manager">
+    <DashboardLayout
+      title="Manager Dashboard"
+      role="manager"
+      primaryActionLabel="Add New Unit"
+      onPrimaryAction={() => setIsAddUnitModalOpen(true)}
+    >
       <Suspense fallback={
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -334,6 +372,7 @@ export default function ManagerUnitPage() {
       }>
         <UnitDashboardContent />
       </Suspense>
+      <AddUnitModal isOpen={isAddUnitModalOpen} onClose={() => setIsAddUnitModalOpen(false)} />
     </DashboardLayout>
   );
 }

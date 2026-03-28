@@ -6,8 +6,10 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { GaugeChart } from "@/components/dashboard/GaugeChart";
 import { TrendChart } from "@/components/dashboard/TrendChart";
+import { AddUnitModal } from "@/components/dashboard/modals/AddUnitModal";
 import { Copy, Check, Calendar, Download, RefreshCw, AlertTriangle, Zap, Activity } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { downloadCsv } from "@/lib/export";
 
 export default function ManagerDashboard() {
   const router = useRouter();
@@ -20,6 +22,7 @@ export default function ManagerDashboard() {
   const [availableSites, setAvailableSites] = useState<any[]>([]);
   const [activeSiteId, setActiveSiteId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -91,9 +94,45 @@ export default function ManagerDashboard() {
 
   const handleCopy = () => {
     if (!site) return;
-    navigator.clipboard.writeText(`${window.location.origin}/signal-input`);
+    const scopedLink = activeUnitId
+      ? `${window.location.origin}/signal-input?unit=${activeUnitId}`
+      : `${window.location.origin}/signal-input`;
+    navigator.clipboard.writeText(scopedLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleExport = () => {
+    if (!site) {
+      return;
+    }
+
+    downloadCsv(
+      `${site.name.toLowerCase().replace(/\s+/g, "-")}-dashboard-summary.csv`,
+      [
+        {
+          site: site.name,
+          reporting_week: new Date(site.week_ending || Date.now()).toLocaleDateString(),
+          csi: site.csi,
+          oai: site.oai,
+          mod: site.mod_val,
+          csd: site.csd,
+          status: site.status,
+        },
+        ...site.units.map((unit: any) => ({
+          unit: unit.name,
+          csi: unit.csi,
+          oai: unit.oai,
+          mod: unit.mod_val,
+          csd: unit.csd,
+          status: unit.status,
+        })),
+        ...submissions.map((item: any) => ({
+          signal_status_unit: item.name,
+          signal_status: item.status,
+        })),
+      ]
+    );
   };
 
   if (loading) {
@@ -151,14 +190,19 @@ export default function ManagerDashboard() {
   };
 
   return (
-    <DashboardLayout title="Manager Dashboard" role="manager">
+    <DashboardLayout
+      title="Manager Dashboard"
+      role="manager"
+      primaryActionLabel="Add New Unit"
+      onPrimaryAction={() => setIsAddUnitModalOpen(true)}
+    >
       <div className="flex flex-col gap-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-[#1F3A4A] mb-1">{site.name}</h1>
             <p className="text-sm text-gray-400 font-medium">
-              Reporting Period: {new Date(site.units[0]?.week_ending || Date.now()).toLocaleDateString()}
+              Reporting Period: {new Date(site.week_ending || Date.now()).toLocaleDateString()}
             </p>
           </div>
           <div className="flex flex-col md:flex-row gap-3 shrink-0">
@@ -187,10 +231,16 @@ export default function ManagerDashboard() {
 
         {/* Action Bar */}
         <div className="flex justify-end items-center gap-3">
-          <button className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => router.push("/dashboard/manager/reports?view=current-week")}
+            className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors"
+          >
             <Calendar size={14} className="text-gray-400" /> Current Week
           </button>
-          <button className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors">
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-[#1F3A4A] shadow-sm hover:bg-gray-50 transition-colors"
+          >
             <Download size={14} className="text-gray-400" /> Export
           </button>
           <button 
@@ -246,7 +296,7 @@ export default function ManagerDashboard() {
               <Calendar size={12} /> Last 6 Weeks
             </div>
           </div>
-          <TrendChart data={formattedTrend} title="Site Strain Trend" />
+          <TrendChart data={formattedTrend} variant="plain" />
         </div>
 
         {/* Unit Overview */}
@@ -364,6 +414,12 @@ export default function ManagerDashboard() {
           </div>
         </div>
       </div>
+      <AddUnitModal
+        isOpen={isAddUnitModalOpen}
+        onClose={() => setIsAddUnitModalOpen(false)}
+        onCreated={fetchData}
+        preferredSiteId={activeSiteId}
+      />
     </DashboardLayout>
   );
 }

@@ -1,3 +1,5 @@
+import { buildSignInPath } from "./auth";
+
 interface FetchOptions extends RequestInit {
   token?: string;
 }
@@ -53,7 +55,9 @@ export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}):
     if (!res.ok) {
       if (res.status === 401 && typeof window !== 'undefined') {
         localStorage.removeItem('token');
-        window.location.replace('/signin');
+        const currentPath = `${window.location.pathname}${window.location.search}`;
+        const signInPath = window.location.pathname === '/signin' ? '/signin' : buildSignInPath(currentPath);
+        window.location.replace(signInPath);
       }
       throw new Error(data.error || 'Something went wrong');
     }
